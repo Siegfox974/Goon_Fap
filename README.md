@@ -95,6 +95,12 @@ Le panneau permet aussi de :
 ### Plein écran
 
 Utilise le **bouton plein écran du site**, ou **⛶** dans le panneau, qui fait la même chose. GoonFap s'affiche par-dessus et son panneau reste cliquable.
+**Bandes noires sur les côtés ?** Le bouton **↔** du panneau a trois crans :
+
+- **Remplir** (par défaut) : l'image couvre tout l'écran, les bords sont un peu rognés.
+- **Zoom ×1,33** : pour les vidéos dont les bandes noires sont incrustées dans l'image elle-même.
+- **Image entière** : la vidéo d'origine, avec ses bandes.
+
 Avec le plein écran natif de la vidéo (double-clic sur certaines vidéos), les messages et GIF s'affichent, mais Chrome empêche de cliquer sur le panneau. Si un site bloque tout, **F11** marche toujours.
 
 ### Tes GIF : dossier `extension/gifs/`

@@ -2,7 +2,8 @@
 /* eslint-disable no-var */
 var GF = globalThis.GF || (globalThis.GF = (() => {
   const DEFAULTS = {
-    _v: 5,
+    _v: 6,
+    cover: true,       // plein écran : l'image remplit l'écran (plus de bandes noires, bords rognés)
     power: 1,          // 100 % = le max de la manette
     pulse: 140,        // ms par vibration
     source: 'auto',    // 'auto' | 'funscript' | 'visual' (barre rythmo à l'image) | 'audio' (le son)
@@ -259,7 +260,8 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     s = Object.assign({}, s || {});
     if ((s._v || 0) < 3) { s.beatSfx = true; s.source = 'auto'; }
     if ((s._v || 0) < 4) { s.beatKind = 'fap'; }
-    if ((s._v || 0) < 5) { s.moans = false; s._v = 5; }
+    if ((s._v || 0) < 5) { s.moans = false; }
+    if ((s._v || 0) < 6) { s.cover = true; s._v = 6; }
     return s;
   }
 

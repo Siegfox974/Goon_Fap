@@ -157,6 +157,7 @@
     <div class="row">
       <button data-a="play" title="Lecture / pause de la vidéo">⏯</button>
       <button data-a="immersive" title="Plein écran en gardant les messages">⛶</button>
+      <button data-a="cover" title="Plein écran : remplir l'écran (sans bandes noires) / image entière">↔</button>
       <button data-a="track" title="Afficher / masquer la piste">👁</button>
       <button data-a="voice" title="Voix on/off">🔊</button>
       <button data-a="gifs" title="GIF on/off">🖼</button>
@@ -562,6 +563,7 @@
       if (st.beats) showGif();
       st.nextGif = now + S.gifEvery * 1000 * (0.7 + Math.random() * 0.6);
     }
+    if (document.fullscreenElement && S.cover) applyCover(); // la vidéo a pu changer
     updateLane();
     updatePanel(bpm, silent);
   }, 200);
@@ -648,6 +650,7 @@
     $('[data-a="source"]').textContent = (S.source === 'auto' ? 'Auto : ' : '') + (fsMode ? '📜 Script' : visual ? '👁 Barre' : '🎵 Son');
     $('.snd').textContent = soundsLine();
     $('[data-a="voice"]').classList.toggle('on', !!S.voice);
+    $('[data-a="cover"]').classList.toggle('on', !!S.cover);
     $('[data-a="gifs"]').classList.toggle('on', !!S.gifs);
     $('[data-a="gifs"]').title = gifCount ? `GIF on/off (${gifCount} GIF)` : 'Aucun GIF : mets-en dans le dossier gifs/ de l\'extension';
     $('.meter').classList.toggle('hidden', mode !== 'audio');
@@ -794,8 +797,31 @@
     imm.v.controls = imm.hadControls;
     imm = null;
   }
+  // Remplir l'écran : en plein écran, l'image est zoomée pour supprimer les bandes noires (bords rognés).
+  let coverV = null, coverAnc = [];
+  function applyCover() {
+    const on = !!(S.cover && document.fullscreenElement);
+    const v = on ? mainVideo() : null;
+    if (coverV && (coverV !== v || S.cover !== 'zoom')) coverV.style.removeProperty('transform');
+    if (coverV && coverV !== v) {
+      coverV.classList.remove('gf-cover', 'gf-cover-fill');
+      coverAnc.forEach(e => e.classList.remove('gf-cover-anc')); coverAnc = []; coverV = null;
+    }
+    if (!v) return;
+    coverV = v;
+    v.classList.add('gf-cover');
+    // si l'élément vidéo lui-même ne couvre pas l'écran (lecteur au format fixe), on l'agrandit aussi
+    const r = v.getBoundingClientRect();
+    if (!v.classList.contains('gf-cover-fill') && (r.width < innerWidth * 0.97 || r.height < innerHeight * 0.97)) {
+      for (let p = v.parentElement; p && p !== document.fullscreenElement && p !== document.documentElement; p = p.parentElement) { p.classList.add('gf-cover-anc'); coverAnc.push(p); }
+      v.classList.add('gf-cover-fill');
+    }
+    // Zoom : pour les vidéos dont les bandes noires sont incrustées dans l'image elle-même
+    if (S.cover === 'zoom') v.style.setProperty('transform', 'scale(1.333)', 'important');
+  }
   const onFs = () => {
     const fe = document.fullscreenElement;
+    setTimeout(applyCover, 300);
     if (!fe) exitImmersive();
     raise(); // repasse au-dessus du nouvel élément plein écran
     setTimeout(raise, 150); // Chrome finit parfois de placer l'élément plein écran juste après l'événement
@@ -909,6 +935,11 @@
       case 'sndtest': send({ type: 'test-sounds' }); break;
       case 'play': { const v = mainVideo(); if (v) v.paused ? v.play().catch(() => {}) : v.pause(); break; }
       case 'immersive': toggleImmersive(); break;
+      case 'cover':
+        // remplir → zoom (bandes incrustées dans la vidéo) → image entière → remplir…
+        S.cover = S.cover === true ? 'zoom' : S.cover === 'zoom' ? false : true; saveSettings(); applyCover();
+        message({ true: '↔ Remplir l\'écran (sans bandes noires)', zoom: '↔ Zoom ×1,33 (bandes noires incrustées dans la vidéo)', false: '↔ Image entière' }[String(S.cover)], 2400, { speak: false });
+        break;
       case 'track': S.track = !S.track; saveSettings(); break;
       case 'voice': S.voice = !S.voice; if (!S.voice) chrome.runtime.sendMessage({ type: 'gf-hush' }).catch(() => {}); saveSettings(); break;
       case 'gifs': S.gifs = !S.gifs; saveSettings(); if (S.gifs) showGif(); break;
@@ -981,6 +1012,7 @@
     clearInterval(slow); clearInterval(fsLoop); fsReset(); clearTimeout(st.timer); clearTimeout(st.missTimer); clearTimeout(retry); stopTease(); stopRumble();
     clearPend();
     exitImmersive();
+    S.cover = false; applyCover();
     document.removeEventListener('fullscreenchange', onFs);
     if (usePopover) try { host.hidePopover(); } catch (e) {}
     window.removeEventListener('keydown', onKey, true);

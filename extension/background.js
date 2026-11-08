@@ -24,6 +24,9 @@ async function ensureOffscreen() {
 // Styles du plein écran GoonFap (classes posées par content.js uniquement pendant le plein écran)
 const FS_CSS = `
 .gf-fs-anc{transform:none!important;filter:none!important;backdrop-filter:none!important;perspective:none!important;contain:none!important;will-change:auto!important;clip-path:none!important;mask:none!important;z-index:2147483646!important;opacity:1!important}
+.gf-cover{object-fit:cover!important}
+.gf-cover-fill{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important}
+.gf-cover-anc{transform:none!important;filter:none!important;contain:none!important;will-change:auto!important;perspective:none!important}
 .gf-immersive-video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483646!important;background:#000!important;object-fit:contain!important;transform:none!important;margin:0!important;padding:0!important;visibility:visible!important;display:block!important}`;
 
 async function inject(tabId) {
