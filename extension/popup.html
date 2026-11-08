@@ -8,7 +8,7 @@
   <h1>Goon<b>Fap</b> <span class="b18">18+</span></h1>
 
   <section id="gate" class="hidden">
-    <p>Extension réservée aux <b>adultes majeurs</b>. Elle affiche des messages à caractère sexuel par-dessus les vidéos.</p>
+    <p>Extension pornographique réservée aux <b>adultes majeurs</b>. Elle affiche et fait entendre du contenu sexuel explicite par-dessus les vidéos.</p>
     <label class="check"><input type="checkbox" id="age"> J'ai 18 ans ou plus.</label>
     <button id="age-ok" class="main" disabled>Entrer 😈</button>
   </section>
@@ -17,44 +17,85 @@
     <button id="go" class="main">▶ Lancer sur cet onglet</button>
     <p id="status" class="status"></p>
     <ol class="how">
-      <li>Branche ta DualShock 4 et appuie sur un bouton.</li>
-      <li>Ouvre la vidéo FapHero et clique sur <b>Lancer</b>.</li>
-      <li>Mets en plein écran avec le bouton <b>⛶</b> de GoonFap pour garder les messages.</li>
+      <li>Branche ta manette et appuie sur un bouton.</li>
+      <li>Ouvre la vidéo FapHero, clique <b>Lancer</b>.</li>
+      <li>Passe en plein écran avec <b>⛶</b> (dans le panneau GoonFap), puis clique <b>🎯 Caler sur la barre rythmo</b>.</li>
     </ol>
+    <p id="incog" class="small hidden">🕶 Pour la navigation privée : <a href="#" id="open-ext">ouvre les détails de l'extension</a> et active « Autoriser en navigation privée ».</p>
 
     <details open>
-      <summary>💓 Vibrations</summary>
+      <summary>💓 Vibrations & rythme</summary>
+      <label>Suivre
+        <select id="source">
+          <option value="visual">👁 La barre rythmo à l'image (recommandé)</option>
+          <option value="audio">🎵 Le son de la vidéo</option>
+        </select>
+      </label>
       <label>Puissance <output data-for="power"></output><input type="range" id="power" min="0.1" max="1" step="0.05"></label>
       <label>Durée d'une vibration <output data-for="pulse"></output><input type="range" id="pulse" min="40" max="400" step="10"></label>
+      <label>Avance (barre rythmo) <output data-for="vOffset"></output><input type="range" id="vOffset" min="-100" max="400" step="10"></label>
+      <label>Tolérance de couleur des repères <output data-for="vTol"></output><input type="range" id="vTol" min="30" max="180" step="5"></label>
       <label class="check"><input type="checkbox" id="tease"> Battements de cœur pendant les pauses</label>
-      <label class="check"><input type="checkbox" id="tempoBoost"> Plus le tempo est rapide, plus ça vibre fort</label>
-      <label class="check"><input type="checkbox" id="nuance"> Force selon le volume du beat</label>
+      <label class="check"><input type="checkbox" id="tempoBoost"> Plus c'est rapide, plus ça vibre fort</label>
     </details>
 
     <details>
-      <summary>🎵 Détection du rythme</summary>
+      <summary>😈 Messages & voix</summary>
+      <label>Ton
+        <select id="level">
+          <option value="hard">Salope 💦 (très cru)</option>
+          <option value="hot">Explicite 🔥</option>
+          <option value="soft">Coquin 😏</option>
+        </select>
+      </label>
+      <label>Tu as
+        <select id="anatomy"><option value="cock">Une bite 🍆</option><option value="pussy">Une chatte 🍑</option><option value="any">Peu importe</option></select>
+      </label>
+      <label>Quantité
+        <select id="talk"><option value="0">Aucun</option><option value="1">Peu</option><option value="2">Normal</option><option value="3">Beaucoup</option></select>
+      </label>
+      <label class="check"><input type="checkbox" id="voice"> Lire les messages à voix haute</label>
+      <label>Voix
+        <select id="voiceName"><option value="">Automatique (la plus naturelle)</option></select>
+      </label>
+      <p class="small">Les voix « Natural » / « Online » sonnent humain : elles sont dans <b>Microsoft Edge</b>. Dans Chrome, prends « Google français ».</p>
+      <label>Débit <output data-for="voiceRate"></output><input type="range" id="voiceRate" min="0.6" max="1.4" step="0.05"></label>
+      <label>Hauteur <output data-for="voicePitch"></output><input type="range" id="voicePitch" min="0.6" max="1.6" step="0.05"></label>
+      <button id="voice-test" class="small-btn">🔊 Tester la voix</button>
+    </details>
+
+    <details>
+      <summary>🎧 Sons (dossier sons/)</summary>
+      <p id="snd-count" class="small"></p>
+      <label class="check"><input type="checkbox" id="clips"> Jouer les sons du dossier</label>
+      <label class="check"><input type="checkbox" id="moans"> Gémissements en continu selon le tempo</label>
+      <label>Volume <output data-for="clipVol"></output><input type="range" id="clipVol" min="0" max="1" step="0.05"></label>
+      <label class="check"><input type="checkbox" id="beatSfx"> Un bruitage sur chaque beat (sons/beat)</label>
+      <label>Volume des bruitages <output data-for="beatVol"></output><input type="range" id="beatVol" min="0" max="1" step="0.05"></label>
+    </details>
+
+    <details>
+      <summary>🖼 GIF (dossier gifs/)</summary>
+      <p id="gif-count" class="small"></p>
+      <label class="check"><input type="checkbox" id="gifs"> Afficher des GIF par-dessus la vidéo</label>
+      <label>Un GIF toutes les <output data-for="gifEvery"></output><input type="range" id="gifEvery" min="4" max="60" step="1"></label>
+      <label>Durée d'affichage <output data-for="gifDur"></output><input type="range" id="gifDur" min="2" max="20" step="1"></label>
+      <label>Taille <output data-for="gifSize"></output><input type="range" id="gifSize" min="0.15" max="0.7" step="0.05"></label>
+    </details>
+
+    <details>
+      <summary>🎵 Détection au son</summary>
       <label>Sensibilité <output data-for="sens"></output><input type="range" id="sens" min="0.6" max="3" step="0.1"></label>
-      <p class="small">Trop de vibrations parasites → monte la valeur. Des beats ratés → baisse-la.</p>
       <label>Sons à suivre
         <select id="band">
-          <option value="high">Aigus — clics, claps (FapHero classique)</option>
+          <option value="high">Aigus — clics, claps</option>
           <option value="all">Tout le son</option>
           <option value="low">Graves — kicks, basses</option>
         </select>
       </label>
       <label>Écart mini entre deux beats <output data-for="minGap"></output><input type="range" id="minGap" min="80" max="600" step="10"></label>
       <label class="check"><input type="checkbox" id="predict"> Anticiper quand le tempo est stable</label>
-      <label>Avance des vibrations anticipées <output data-for="offset"></output><input type="range" id="offset" min="0" max="150" step="5"></label>
-    </details>
-
-    <details>
-      <summary>😈 Messages</summary>
-      <label>Ton
-        <select id="level"><option value="soft">Coquin 😏</option><option value="hot">Explicite 🔥</option></select>
-      </label>
-      <label>Quantité
-        <select id="talk"><option value="0">Aucun</option><option value="1">Peu</option><option value="2">Normal</option><option value="3">Beaucoup</option></select>
-      </label>
+      <label>Avance <output data-for="offset"></output><input type="range" id="offset" min="0" max="200" step="5"></label>
     </details>
     <button id="reset" class="link">Réglages par défaut</button>
   </section>

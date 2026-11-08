@@ -52,6 +52,7 @@ async function stop() {
     try { await chrome.runtime.sendMessage({ target: 'offscreen', type: 'stop' }); } catch (e) {}
     try { await chrome.offscreen.closeDocument(); } catch (e) {}
   }
+  chrome.tts.stop();
   if (st.tabId != null) chrome.tabs.sendMessage(st.tabId, { type: 'gf-remove' }).catch(() => {});
 }
 
@@ -63,7 +64,38 @@ chrome.runtime.onMessage.addListener((msg, sender, send) => {
   }
   if (msg.type === 'gf-stop') { stop().then(() => send({ ok: true })); return true; }
   if (msg.type === 'gf-status') { getState().then(send); return true; }
+  if (msg.type === 'gf-say') { speak(msg.text, msg.opts || {}); return; }
+  if (msg.type === 'gf-hush') { chrome.tts.stop(); return; }
+  if (msg.type === 'gf-voices') { voices().then(v => send(v)); return true; }
 });
+
+// ---------- Voix (synthèse vocale) ----------
+// chrome.tts ne passe pas par l'onglet : la voix n'est pas recapturée par la détection audio.
+function voices() {
+  return new Promise(res => chrome.tts.getVoices(v => res((v || []).filter(x => /^fr/i.test(x.lang || '')))));
+}
+// Les voix "Natural"/"Online"/neuronales sonnent humain ; les voix système sonnent robot.
+function voiceScore(v) {
+  const n = v.voiceName || '';
+  let s = 0;
+  if (/natural|neural|online/i.test(n)) s += 100;
+  if (/google/i.test(n)) s += 50;
+  if (/denise|vivienne|eloise|brigitte|coralie|jacqueline|yvette|celeste|ariane/i.test(n)) s += 20; // voix féminines
+  if (/henri|remy|paul|claude|alain|jerome|maurice|yves|antoine|guillaume/i.test(n)) s -= 30;
+  if (/fr-FR/i.test(v.lang || '')) s += 5;
+  return s;
+}
+async function speak(text, o) {
+  text = String(text || '').replace(/<[^>]+>/g, ' ').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').replace(/·e/g, 'e').trim();
+  if (!text) return;
+  let name = o.voiceName;
+  if (!name) {
+    const list = await voices();
+    list.sort((a, b) => voiceScore(b) - voiceScore(a));
+    name = list[0] && list[0].voiceName;
+  }
+  chrome.tts.speak(text, { voiceName: name || undefined, lang: name ? undefined : 'fr-FR', rate: o.rate || 0.95, pitch: o.pitch || 1.1, volume: o.volume ?? 1, enqueue: false });
+}
 
 // La page a changé (vidéo suivante…) : on remet l'overlay
 chrome.tabs.onUpdated.addListener(async (tabId, info) => {

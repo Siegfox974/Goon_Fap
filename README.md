@@ -5,40 +5,74 @@ Tout tourne dans le navigateur : aucune installation, aucune vidéo envoyée sur
 
 ## Sur un site porno : l'extension Chrome (recommandé)
 
-L'extension marche sur **n'importe quel site** (Eporner ou autre) :
-
-- elle capte le son de l'onglet ;
-- elle détecte chaque beat de la vidéo en temps réel ;
-- elle fait vibrer la manette dessus, à **100 % par défaut** ;
-- elle affiche la piste, les messages et les boutons **par-dessus la vidéo du site**.
+L'extension marche sur **n'importe quel site** (Eporner ou autre). Elle fait vibrer la manette **pile sur la barre rythmo de la vidéo** : elle regarde l'image et suit les repères (losanges, cercles…) jusqu'à la zone de frappe.
+Elle affiche par-dessus le site les messages, les GIF et les boutons. Elle te parle à voix haute et joue tes sons de gémissements au tempo.
 
 ### Installer (une seule fois)
 
-1. Ouvre `chrome://extensions` dans Chrome (ou `edge://extensions` dans Edge).
-2. Active le **Mode développeur** (interrupteur en haut à droite).
+1. Ouvre `chrome://extensions` (ou `edge://extensions`).
+2. Active le **Mode développeur** (en haut à droite).
 3. Clique sur **Charger l'extension non empaquetée** et choisis le dossier **`extension`** du projet.
 4. Épingle l'icône 💗 GoonFap dans la barre d'outils.
+5. **Navigation privée :** clique sur **Détails** sous GoonFap et active **« Autoriser en navigation privée »**.
+
+Après avoir ajouté des GIF ou des sons, clique sur la flèche **Recharger** de GoonFap dans `chrome://extensions`.
 
 ### Utiliser
 
-1. Branche la DualShock 4 (USB ou Bluetooth) et appuie sur un bouton.
-2. Ouvre la vidéo FapHero sur le site.
-3. Clique sur l'icône GoonFap, puis sur **▶ Lancer sur cet onglet**.
-4. Lance la vidéo : la manette vibre sur chaque beat.
-5. Pour le plein écran, utilise le bouton **⛶ de GoonFap**, qui garde les messages visibles. Si le plein écran du site les cache, c'est le cas.
+1. Branche la manette et appuie sur un bouton.
+2. Ouvre la vidéo FapHero, clique sur l'icône GoonFap puis **▶ Lancer sur cet onglet**.
+3. Passe en plein écran avec **⛶** dans le panneau GoonFap. Ça garde les messages visibles, contrairement au plein écran du site.
+4. Clique sur **🎯 Caler sur la barre rythmo**. La vidéo se met en pause et il y a 3 clics à faire :
+   1. trace un rectangle autour de la barre rythmo ;
+   2. clique sur un repère (un losange) pour que GoonFap retienne sa couleur ;
+   3. clique sur la zone de frappe (là où les repères doivent tomber).
+5. La vidéo repart : chaque repère qui arrive sur la cible fait vibrer la manette.
 
-Le panneau en haut à droite permet de :
+Si tu changes de vidéo et que la barre n'est plus au même endroit, refais **🎯**.
 
-- régler la puissance ;
-- mettre la vidéo en lecture ou en pause ;
+Si les vibrations arrivent un poil en retard ou en avance, règle avec **⏪ / ⏩** dans le panneau.
+
+Les vidéos sans barre rythmo peuvent suivre le **son** à la place : bouton **🎵** du panneau.
+
+Le panneau permet aussi de :
+
+- régler la puissance (100 % par défaut) ;
+- mettre la vidéo en pause ;
+- couper la voix ou les GIF ;
 - déclencher **🥵 Au bord !** : stop de 15 s ;
-- déclencher **💦 Je jouis** : vibration longue à fond.
+- déclencher **💦 Je jouis** : vibration longue à fond et rafale de GIF.
 
-Quand le tempo est stable, GoonFap le verrouille 🔒 et **anticipe** les vibrations pour qu'elles tombent pile sur le beat.
-Pendant les pauses de la vidéo, des **battements de cœur** légers continuent de te taquiner.
+### Messages et voix
 
-Si ça vibre sur des bruits qui ne sont pas des beats, monte la **sensibilité** dans le popup.
-Si des beats sont ratés, baisse-la ou change les « Sons à suivre ».
+- **Ton :** *Salope 💦* (très cru, par défaut), *Explicite* ou *Coquin*. Les phrases s'accordent à ton anatomie (bite / chatte), à régler dans le popup.
+- **Voix :** les messages sont lus à voix haute. Pour une voix **naturelle**, utilise **Microsoft Edge** et choisis une voix « Natural » / « Online » (⭐ dans la liste). Dans Chrome, la meilleure est « Google français ».
+  La voix est jouée par l'extension, pas par l'onglet, donc elle ne perturbe pas la détection.
+
+### Tes GIF : dossier `extension/gifs/`
+
+Dépose tes `.gif`, `.webp`, `.png`, `.jpg`, `.mp4` ou `.webm` dans `extension/gifs/` et recharge l'extension. Les sous-dossiers marchent aussi.
+GoonFap en affiche sur les côtés de l'écran pendant la séance, jamais sur la barre rythmo. Fréquence, durée et taille se règlent dans le popup.
+
+### Tes sons : dossier `extension/sons/`
+
+Range tes `.wav` ou `.mp3` dans les sous-dossiers de `extension/sons/`. Le fichier `LISEZ-MOI.txt` du dossier donne le détail :
+
+| Dossier | Quand |
+|---|---|
+| `lent/`, `moyen/`, `rapide/` | Gémissements enchaînés en continu, selon le tempo de la vidéo |
+| `stop/`, `reprise/` | Pause de la vidéo, reprise du rythme |
+| `bord/`, `jouis/` | Boutons Au bord / Je jouis |
+| `debut/`, `taquin/` | Lancement, moments taquins |
+| `beat/` | Un bruitage sur **chaque beat** (« plap »…), à activer dans le popup |
+
+Une bonne source est l'[OpenNSFW Sound Pack](https://opennsfw.carrd.co/), gratuit, à télécharger sur leur site :
+
+- gémissements *Low / Medium / High* → `lent/`, `moyen/`, `rapide/` ;
+- *Plaps* → `beat/` ;
+- *Cum* → `jouis/`.
+
+Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/` et `sons/` sont ignorés par git.
 
 ## L'application web (vidéos sur ton PC, programmes générés)
 

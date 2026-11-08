@@ -1,0 +1,7 @@
+# Contenu perso de l'utilisateur : jamais commité
+gifs/*
+!gifs/LISEZ-MOI.txt
+sons/**/*
+!sons/*/
+!sons/LISEZ-MOI.txt
+!sons/*/.gitkeep

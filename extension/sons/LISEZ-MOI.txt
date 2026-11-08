@@ -1,0 +1,22 @@
+Range ici tes sons (.wav, .mp3, .ogg, .m4a…) dans les sous-dossiers :
+
+  debut/    au lancement (« coucou mon cochon… »)
+  lent/     tempo lent      → joués en boucle, l'un après l'autre (gémissements doux)
+  moyen/    tempo moyen     → idem (gémissements)
+  rapide/   tempo rapide    → idem (gros gémissements)
+  taquin/   moments taquins
+  stop/     quand la vidéo fait une pause
+  reprise/  quand le rythme repart
+  bord/     bouton « Au bord ! »
+  jouis/    bouton « Je jouis » (orgasme)
+  beat/     un bruitage court joué sur CHAQUE beat (claquements, « plap »…)
+            → à activer dans le popup : « Un bruitage sur chaque beat »
+
+Les sons sont joués par l'extension (pas dans l'onglet) : ils ne perturbent pas la détection.
+
+Ensuite, va sur chrome://extensions et clique « Recharger » sur GoonFap.
+
+Idée : l'OpenNSFW Sound Pack (https://opennsfw.carrd.co/) est gratuit et contient
+des gémissements (Low / Medium / High → lent / moyen / rapide), des « plaps »
+(→ beat) et des orgasmes (→ jouis). Télécharge-le depuis leur site et range les
+fichiers ici. Leurs conditions interdisent de le ré-empaqueter : garde-le pour toi.

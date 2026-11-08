@@ -1,0 +1,9 @@
+Dépose ici tes GIF (ou .webp, .png, .jpg, .mp4, .webm courts).
+Les sous-dossiers marchent aussi.
+
+Ensuite, va sur chrome://extensions et clique sur la flèche « Recharger » de GoonFap
+pour qu'il les prenne en compte.
+
+Pendant la séance, GoonFap en affiche un de temps en temps, sur les côtés de l'écran
+(jamais sur la barre rythmo), plus une rafale quand tu cliques « Je jouis ».
+Fréquence, durée et taille se règlent dans le popup.
