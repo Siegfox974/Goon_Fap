@@ -98,6 +98,8 @@ const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbatio
 async function loadAnims(loader) {
   const all = await GF.listDir('animations');
   // animations MMD (.vmd)
+  const ignored = all.filter(x => /\.(vmd|vrma)$/i.test(x) && !SCENE_OF(x));
+  if (ignored.length) post({ type: 'anim-ignored', files: ignored.map(f => f.split('/').pop()) });
   for (const f of all.filter(x => /\.vmd$/i.test(x))) {
     const sc = SCENE_OF(f); if (!sc) continue;
     try {
