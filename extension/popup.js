@@ -96,7 +96,7 @@ function renderSoundList(files) {
 }
 const LABELS = { fap: 'fap', lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes féminins',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
-const SCENES = [['', "D'après le nom"], ['masturbation', 'Masturbation'], ['fellation', 'Fellation'], ['chevauche', 'Chevauche'], ['twerk', 'Twerk'], ['danse', 'Danse'], ['ignorer', 'Ignorer']];
+const SCENES = [['', 'Aucune (▶ seulement)'], ['masturbation', 'Masturbation'], ['fellation', 'Fellation'], ['chevauche', 'Chevauche'], ['twerk', 'Twerk'], ['danse', 'Danse'], ['ignorer', 'Ignorer']];
 async function renderAnims() {
   const files = (await listDir('animations')).filter(f => /\.(vmd|vrma)$/i.test(f));
   const box = $('#anim-list'); box.textContent = '';
@@ -115,8 +115,6 @@ async function renderAnims() {
     sel.value = (S.animScenes || {})[f] || '';
     sel.addEventListener('change', () => { S.animScenes = Object.assign({}, S.animScenes, { [f]: sel.value }); if (!sel.value) delete S.animScenes[f]; chrome.storage.local.set({ settings: S }); });
     play.addEventListener('click', () => {
-      // une animation sans scène connue est rangée en « masturbation » pour pouvoir la jouer
-      if (!sel.value && !/mastur|fap|finger|touch|rub|solo|blow|fella|suck|bj|oral|pipe|ride|riding|chevauch|dildo|gode|cowgirl|twerk|dance|danse|idle|tease|strip/i.test(f)) { sel.value = 'masturbation'; S.animScenes = Object.assign({}, S.animScenes, { [f]: 'masturbation' }); }
       S.compAnim = f; S.compagne = true; chrome.storage.local.set({ settings: S }); showNow();
     });
     const name = document.createElement('span'); name.textContent = f.replace(/^animations\//, ''); name.title = f;

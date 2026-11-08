@@ -98,14 +98,13 @@ function stripMore(why) {
 }
 
 // ---------- Animations d'artistes (.vrma, dossier animations/) ----------
-const sceneOf = f => { const m = cfg.animScenes[f]; return m === 'ignorer' ? null : (m || SCENE_OF(f)); };
+// sans scène (ni choisie, ni devinée d'après le nom) : « libre », jouable seulement avec le bouton ▶ du popup
+const sceneOf = f => { const m = cfg.animScenes[f]; return m === 'ignorer' ? null : (m || SCENE_OF(f) || 'libre'); };
 const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbation' : /blow|fella|suck|bj|oral|pipe/i.test(f) ? 'fellation'
   : /ride|riding|chevauch|dildo|gode|cowgirl/i.test(f) ? 'chevauche' : /twerk/i.test(f) ? 'twerk' : /dance|danse|idle|tease|strip/i.test(f) ? 'danse' : null;
 async function loadAnims(loader) {
   const all = await GF.listDir('animations');
   // animations MMD (.vmd)
-  const ignored = all.filter(x => /\.(vmd|vrma)$/i.test(x) && !sceneOf(x) && cfg.animScenes[x] !== 'ignorer');
-  if (ignored.length) post({ type: 'anim-ignored', files: ignored.map(f => f.split('/').pop()) });
   for (const f of all.filter(x => /\.vmd$/i.test(x))) {
     const sc = sceneOf(f); if (!sc) continue;
     try {
@@ -205,10 +204,12 @@ const VIEW_DIR = {
   fellation: { pov: [0.35, 0.5, 1], cote: [1, 0.15, 0.05] },
   chevauche: { pov: [0.25, -0.02, -1], cote: [1, 0.15, -0.4] },
   twerk: { pov: [0.3, 0.1, -1], cote: [1, 0.1, -0.25] },
+  libre: { pov: [0.15, 0.3, 1], cote: [1, 0.2, 0.3] },
 };
 const fits = {};
 function poseScene(sc, d, t = 0) {
-  const vm = (anims[sc] || []).find(a => a.vmd);
+  const fa = forcedAnim();
+  const vm = fa && fa.sc === sc ? { vmd: fa.clip } : (anims[sc] || []).find(a => a.vmd);
   if (vm) { poseVmd(vm.vmd, d * vmdSpan(vm.vmd)); return; }
   if (sc === 'masturbation') P.poseMasturbation(vrm, M, d, t, 1);
   else if (sc === 'fellation') P.poseFellation(vrm, M, F, d, t, 1, false);
@@ -220,26 +221,35 @@ function poseScene(sc, d, t = 0) {
 }
 function computeFit(sc) {
   const pts = [];
+  // orientation du corps : une animation MMD peut la tourner (tout-parent) ; la caméra suit
+  const trunk = ['hips', 'chest'].map(B).filter(Boolean);
+  P.resetPose(vrm, M); if (vrm.isPmx) vrm.solve(false); vrm.scene.updateMatrixWorld(true);
+  const restQ = trunk.map(b => b.getWorldQuaternion(new THREE.Quaternion()).invert());
+  const facing = new THREE.Vector3();
   const names = ['head', 'neck', 'hips', 'chest', 'leftHand', 'rightHand', 'leftLowerArm', 'rightLowerArm', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot', 'leftToes', 'rightToes'];
   for (const d of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
     poseScene(sc, d);
     for (const n of names) { const b = B(n); if (b) pts.push(P.wpos(b).clone()); }
+    trunk.forEach((b, i) => facing.add(new THREE.Vector3(0, 0, 1).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion()).multiply(restQ[i]))));
     const h = B('head'); if (h) pts.push(new THREE.Vector3(0, 0.17 * M.s, 0).applyMatrix4(h.matrixWorld)); // haut du crâne
   }
-  const vmProp = (anims[sc] || []).find(a => a.vmd);
+  facing.y = 0;
+  const yaw = facing.lengthSq() > 0.05 && (anims[sc] || []).some(a => a.vmd) ? Math.atan2(facing.x, facing.z) : 0;
+  const fa = forcedAnim();
+  const vmProp = fa && fa.sc === sc ? { vmd: fa.clip } : (anims[sc] || []).find(a => a.vmd);
   const prop = vmProp ? vmProp.vmd.prop : sc === 'fellation' ? F : sc === 'chevauche' ? R : null;
   if (prop) { pts.push(prop.tip.clone()); if (prop.base) pts.push(prop.base.clone()); else pts.push(prop.tip.clone().addScaledVector(prop.axis, 0.2 * M.s)); }
   const box = new THREE.Box3().setFromPoints(pts);
   const center = box.getCenter(new THREE.Vector3());
   let radius = 0; for (const p of pts) radius = Math.max(radius, p.distanceTo(center));
-  return { center, radius: radius + 0.06 * M.s };
+  return { center, radius: radius + 0.06 * M.s, yaw };
 }
 function fitCamera(sc) {
   if (cfg.frame === 'buste' && sc === 'danse') { frame(); return; }
   const key = sc;
   if (!fits[key]) { const saved = vrm.scene.matrixWorld.clone(); fits[key] = computeFit(sc); }
   const f = fits[key];
-  const dir = new THREE.Vector3(...(VIEW_DIR[sc] || VIEW_DIR.danse)[cfg.view === 'cote' ? 'cote' : 'pov']).normalize();
+  const dir = new THREE.Vector3(...(VIEW_DIR[sc] || VIEW_DIR.danse)[cfg.view === 'cote' ? 'cote' : 'pov']).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), f.yaw || 0);
   const vfov = THREE.MathUtils.degToRad(camera.fov), hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
   const dist = f.radius / Math.sin(Math.min(vfov, hfov) / 2) * 1.02;
   camera.position.copy(f.center).addScaledVector(dir, dist);
