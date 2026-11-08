@@ -3,28 +3,8 @@
 const EXT = /\.(gif|webp|png|jpe?g|avif|mp4|webm)$/i;
 let files = [], recent = [];
 
-function list() {
-  return new Promise(resolve => {
-    if (!chrome.runtime.getPackageDirectoryEntry) return resolve([]);
-    chrome.runtime.getPackageDirectoryEntry(root => {
-      root.getDirectory('gifs', {}, dir => {
-        const out = [];
-        let pending = 0;
-        const walk = d => {
-          pending++;
-          const rd = d.createReader(), all = [];
-          const more = () => rd.readEntries(es => {
-            if (es.length) { all.push(...es); return more(); }
-            all.forEach(e => { if (e.isDirectory) walk(e); else if (EXT.test(e.name)) out.push(e.fullPath.replace(/^\/(crxfs\/)?/, '')); });
-            if (--pending === 0) resolve(out);
-          }, () => { if (--pending === 0) resolve(out); });
-          more();
-        };
-        walk(dir);
-      }, () => resolve([]));
-    });
-  });
-}
+const list = () => GF.listDir('gifs').then(f => f.filter(x => EXT.test(x)));
+GF.indexSounds();
 
 list().then(f => { files = f; parent.postMessage({ gf: 'count', n: files.length }, '*'); });
 
@@ -41,7 +21,7 @@ function show({ avoidTop = 0.82, size = 0.38, dur = 6000 }) {
   const el = document.createElement(isVid ? 'video' : 'img');
   if (isVid) { el.muted = true; el.loop = true; el.autoplay = true; el.playsInline = true; }
   el.className = 'g';
-  el.src = chrome.runtime.getURL(f);
+  el.src = chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/'));
   const W = innerWidth, H = innerHeight;
   const h = Math.round(H * size);
   const place = () => {

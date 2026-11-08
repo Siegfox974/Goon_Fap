@@ -2,9 +2,12 @@
 /* eslint-disable no-var */
 var GF = globalThis.GF || (globalThis.GF = (() => {
   const DEFAULTS = {
+    _v: 3,
     power: 1,          // 100 % = le max de la manette
     pulse: 140,        // ms par vibration
-    source: 'audio',   // 'visual' = suit la barre rythmo à l'image, 'audio' = suit le son
+    source: 'auto',    // 'auto' | 'funscript' | 'visual' (barre rythmo à l'image) | 'audio' (le son)
+    fOffset: 60,       // ms d'avance des vibrations en mode funscript (temps de réaction des moteurs)
+    fMode: 'strokes',  // funscript : 'strokes' = un coup par aller-retour, 'both' = aller ET retour, 'flow' = vibration continue selon la vitesse
     lane: null,        // calibration de la barre rythmo
     vOffset: 70,       // ms d'avance des vibrations en mode barre rythmo
     vTol: 90,          // tolérance de couleur des repères
@@ -25,7 +28,7 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     clips: true,       // jouer les sons du dossier sons/ quand il y en a
     moans: true,       // ambiance : gémissements en continu selon le tempo
     clipVol: 0.9,
-    beatSfx: false,    // un bruitage (dossier sons/beat) sur chaque beat
+    beatSfx: true,     // un bruitage (claquement) sur chaque beat, s'il y a des sons
     beatVol: 0.7,
     gifs: true,        // afficher les GIF du dossier gifs/
     gifEvery: 15,      // secondes entre deux GIF
@@ -207,7 +210,45 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     return null;
   }
 
+  /** Liste récursive d'un dossier de l'extension (pages de l'extension seulement : popup, gifview). */
+  function listDir(name) {
+    return new Promise(resolve => {
+      if (!chrome.runtime.getPackageDirectoryEntry) return resolve([]);
+      chrome.runtime.getPackageDirectoryEntry(root => root.getDirectory(name, {}, dir => {
+        const out = []; let pending = 0;
+        const walk = d => {
+          pending++;
+          const rd = d.createReader(), all = [];
+          const more = () => rd.readEntries(es => {
+            if (es.length) { all.push(...es); return more(); }
+            all.forEach(e => {
+              if (e.isDirectory) walk(e);
+              else if (!e.name.startsWith('.') && !/\.(txt|md)$/i.test(e.name)) out.push(e.fullPath.replace(/^\/(crxfs\/)?/, ''));
+            });
+            if (--pending === 0) resolve(out);
+          }, () => { if (--pending === 0) resolve(out); });
+          more();
+        };
+        walk(dir);
+      }, () => resolve([])));
+    });
+  }
+  const AUDIO_RE = /\.(wav|mp3|ogg|oga|m4a|aac|flac|webm|opus)$/i;
+  /** Liste les sons et l'enregistre pour le moteur audio (qui, lui, ne peut pas lire le dossier). */
+  async function indexSounds() {
+    const files = (await listDir('sons')).filter(f => AUDIO_RE.test(f));
+    try { await chrome.storage.local.set({ soundIndex: files }); } catch (e) {}
+    return files;
+  }
+
+  /** Met à jour d'anciens réglages enregistrés. */
+  function migrate(s) {
+    s = Object.assign({}, s || {});
+    if ((s._v || 0) < 3) { s.beatSfx = true; s.source = 'auto'; s._v = 3; }
+    return s;
+  }
+
   const kindForBpm = bpm => (bpm < 90 ? 'warm' : bpm < 150 ? 'medium' : 'fast');
 
-  return { DEFAULTS, SOFT, HOT, HARD, KINDS, say, fit, classifySound, kindForBpm };
+  return { DEFAULTS, SOFT, HOT, HARD, KINDS, say, fit, classifySound, migrate, listDir, indexSounds, kindForBpm };
 })());

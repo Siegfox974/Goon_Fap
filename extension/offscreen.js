@@ -30,12 +30,15 @@ function onPortMessage(m) {
     case 'mood': Sounds.mood(m.kind); break;
     case 'beat': Sounds.beat(); break;
     case 'clip': Sounds.oneShot(m.kind); break;
+    case 'sound-index': Sounds.setIndex(m.files); break;
+    case 'test-sounds': Sounds.test().then(ok => broadcast({ type: 'snd-test', ok })); break;
   }
 }
 
 chrome.runtime.onMessage.addListener((m, sender, send) => {
   if (m.target !== 'offscreen') return;
   const done = p => p.then(() => send({ ok: true }), e => send({ ok: false, error: String(e && e.message || e) }));
+  if (m.soundIndex) Sounds.setIndex(m.soundIndex);
   if (m.type === 'start') done(startTab(m.streamId, m.settings));
   else if (m.type === 'start-url') done(startUrl(m.url, m.settings)); // utilisé pour les tests
   else if (m.type === 'stop') { stopAll(); send({ ok: true }); }
@@ -274,42 +277,23 @@ const Sounds = (() => {
   const FALLBACK = { lent: ['moyen', 'rapide'], moyen: ['lent', 'rapide'], rapide: ['moyen', 'lent'], taquin: ['lent', 'oral', 'moyen'] };
   const avail = k => (files[k] && files[k].length ? k : (FALLBACK[k] || []).find(f => files[f].length) || null);
 
-  // Liste les fichiers du dossier sons/ (lecture du répertoire de l'extension)
-  const ready = new Promise(resolve => {
-    if (!chrome.runtime.getPackageDirectoryEntry) return resolve();
-    chrome.runtime.getPackageDirectoryEntry(root => {
-      root.getDirectory('sons', {}, dir => {
-        let pending = 0;
-        // Tout est parcouru, et chaque fichier est rangé d'après son dossier ou son nom
-        // (on peut donc déposer un pack entier tel quel).
-        const walk = d => {
-          pending++;
-          const rd = d.createReader(), all = [];
-          const more = () => rd.readEntries(es => {
-            if (es.length) { all.push(...es); more(); return; }
-            for (const e of all) {
-              if (e.isDirectory) walk(e);
-              else if (AUDIO.test(e.name)) {
-                const path = e.fullPath.replace(/^\/(crxfs\/)?/, '');
-                const k = GF.classifySound(path);
-                if (k) files[k].push(path);
-              }
-            }
-            if (--pending === 0) resolve();
-          }, () => { if (--pending === 0) resolve(); });
-          more();
-        };
-        walk(dir);
-      }, () => resolve());
-    });
-  });
-  ready.then(() => broadcast({ type: 'sounds', sounds: summary() }));
+  // La liste des sons est fournie par l'extension (un document offscreen ne peut pas lire son dossier)
+  let readyResolve;
+  const ready = new Promise(r => { readyResolve = r; });
+  function setIndex(paths) {
+    KINDS.forEach(k => { files[k] = []; });
+    (paths || []).forEach(p => { const k = GF.classifySound(p); if (k) files[k].push(p); });
+    readyResolve();
+    broadcast({ type: 'sounds', sounds: summary() });
+  }
 
   function summary() { const o = {}; KINDS.forEach(k => { o[k] = files[k].length; }); return o; }
 
   async function buffer(path) {
     if (buffers.has(path)) return buffers.get(path);
-    const p = fetch(chrome.runtime.getURL(path)).then(r => r.arrayBuffer()).then(b => actx.decodeAudioData(b));
+    // chaque morceau du chemin est encodé : les noms des packs contiennent des espaces, [ ], &, #…
+    const url = chrome.runtime.getURL(path.split('/').map(encodeURIComponent).join('/'));
+    const p = fetch(url).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }).then(b => actx.decodeAudioData(b));
     buffers.set(path, p);
     p.catch(() => buffers.delete(path));
     if (buffers.size > 60) buffers.delete(buffers.keys().next().value);
@@ -349,7 +333,7 @@ const Sounds = (() => {
   function stopCurrent() { clearTimeout(gapTimer); if (cur) { try { cur.s.onended = null; cur.s.stop(); } catch (e) {} cur = null; } }
 
   return {
-    summary,
+    summary, setIndex,
     attach(c) { actx = c; },
     detach() { stopCurrent(); actx = null; current = null; },
     configure(s) {
@@ -382,6 +366,15 @@ const Sounds = (() => {
       let k = opts.beatKind === 'mix' ? (Math.random() < 0.5 ? 'beat' : 'oral') : opts.beatKind;
       if (!files[k] || !files[k].length) k = files.beat.length ? 'beat' : 'oral';
       play(k, opts.beatVol, null, 1.2);
+    },
+    // Test : un claquement puis un orgasme (ou ce qu'on trouve)
+    async test() {
+      await ready;
+      const order = ['beat', 'oral', 'jouis', 'rapide', 'moyen', 'lent'].filter(k => files[k].length);
+      if (!order.length || !actx) return false;
+      const s = await play(order[0], opts.beatVol || 0.8, null, 1.2);
+      if (order[1]) setTimeout(() => play(order.includes('jouis') ? 'jouis' : order[1], opts.clipVol), 700);
+      return !!s;
     },
     has(kind) { const k = MAP[kind] || kind; return !!(files[k] && files[k].length); },
   };

@@ -1,17 +1,17 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const FIELDS = ['finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
+const FIELDS = ['fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
   'voiceRate', 'voicePitch', 'clips', 'moans', 'clipVol', 'beatSfx', 'beatVol', 'gifs', 'gifEvery', 'gifDur', 'gifSize',
   'sens', 'band', 'minGap', 'predict', 'offset'];
-const NUM = new Set(['power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
+const NUM = new Set(['fOffset', 'power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
 const pct = v => Math.round(v * 100) + '%';
-const FMT = { power: pct, pulse: v => v + ' ms', vOffset: v => v + ' ms', vTol: v => v, voiceRate: v => (+v).toFixed(2), voicePitch: v => (+v).toFixed(2),
+const FMT = { fOffset: v => v + ' ms', power: pct, pulse: v => v + ' ms', vOffset: v => v + ' ms', vTol: v => v, voiceRate: v => (+v).toFixed(2), voicePitch: v => (+v).toFixed(2),
   clipVol: pct, beatVol: pct, gifEvery: v => v + ' s', gifDur: v => v + ' s', gifSize: pct, sens: v => (+v).toFixed(1), minGap: v => v + ' ms', offset: v => v + ' ms' };
 let S = Object.assign({}, GF.DEFAULTS);
 
 async function init() {
   const { adult, settings } = await chrome.storage.local.get(['adult', 'settings']);
-  S = Object.assign({}, GF.DEFAULTS, settings || {});
+  S = Object.assign({}, GF.DEFAULTS, GF.migrate(settings));
   await loadVoices();
   fill();
   $(adult ? '#app' : '#gate').classList.remove('hidden');
@@ -62,35 +62,13 @@ $('#age-ok').addEventListener('click', async () => {
   $('#gate').classList.add('hidden'); $('#app').classList.remove('hidden');
 });
 
-// Liste récursive d'un dossier de l'extension
-function listDir(name) {
-  return new Promise(resolve => {
-    if (!chrome.runtime.getPackageDirectoryEntry) return resolve([]);
-    chrome.runtime.getPackageDirectoryEntry(root => root.getDirectory(name, {}, dir => {
-      const out = []; let pending = 0;
-      const walk = d => {
-        pending++;
-        const rd = d.createReader(), all = [];
-        const more = () => rd.readEntries(es => {
-          if (es.length) { all.push(...es); return more(); }
-          all.forEach(e => {
-            if (e.isDirectory) walk(e);
-            else if (!e.name.startsWith('.') && !/\.(txt|md)$/i.test(e.name)) out.push(e.fullPath.replace(/^\/(crxfs\/)?/, ''));
-          });
-          if (--pending === 0) resolve(out);
-        }, () => { if (--pending === 0) resolve(out); });
-        more();
-      };
-      walk(dir);
-    }, () => resolve([])));
-  });
-}
+const listDir = GF.listDir;
 const LABELS = { lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
 async function counts() {
   const g = await listDir('gifs');
   $('#gif-count').textContent = g.length ? `${g.length} fichier(s) dans gifs/.` : 'Aucun GIF : dépose tes .gif / .webp / .mp4 dans le dossier gifs/ de l\'extension, puis recharge-la.';
-  const s = (await listDir('sons')).filter(f => /\.(wav|mp3|ogg|oga|m4a|aac|flac|webm|opus)$/i.test(f));
+  const s = await GF.indexSounds();
   const by = {}; let ignored = 0;
   s.forEach(f => { const k = GF.classifySound(f); if (k) by[k] = (by[k] || 0) + 1; else ignored++; });
   const parts = Object.entries(by).map(([k, v]) => `${LABELS[k] || k} : ${v}`);

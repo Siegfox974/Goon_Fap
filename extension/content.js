@@ -8,11 +8,19 @@
 
   // ---------- Réglages ----------
   let S = Object.assign({}, GF.DEFAULTS);
-  chrome.storage.local.get('settings').then(r => { S = Object.assign({}, GF.DEFAULTS, r.settings || {}); onSettings(); });
+  chrome.storage.local.get('settings').then(r => { S = Object.assign({}, GF.DEFAULTS, GF.migrate(r.settings)); onSettings(); });
   chrome.storage.onChanged.addListener((ch, area) => {
-    if (area === 'local' && ch.settings) { S = Object.assign({}, GF.DEFAULTS, ch.settings.newValue || {}); onSettings(); }
+    if (area === 'local' && ch.soundIndex) send({ type: 'sound-index', files: ch.soundIndex.newValue || [] });
+    if (area === 'local' && ch.settings) { S = Object.assign({}, GF.DEFAULTS, GF.migrate(ch.settings.newValue)); onSettings(); }
   });
   const saveSettings = () => chrome.storage.local.set({ settings: S });
+  // Source réellement utilisée : funscript s'il y en a un, sinon la barre rythmo calée, sinon le son
+  let fsData = null;
+  function src() {
+    if (S.source === 'auto') return fsData ? 'funscript' : (S.lane ? 'visual' : 'audio');
+    if (S.source === 'funscript' && !fsData) return 'audio';
+    return S.source;
+  }
 
   // ---------- Manette ----------
   function pad() {
@@ -88,6 +96,7 @@
 <iframe class="gifs" allowtransparency="true"></iframe>
 <div class="msg"></div>
 <canvas class="track"></canvas>
+<input type="file" class="fsfile hidden" accept=".funscript,.json,application/json">
 <div class="calib hidden"><div class="sel hidden"></div><div class="tgt hidden"></div><div class="banner"></div></div>
 <div class="panel">
   <div class="head">
@@ -100,9 +109,11 @@
     <div class="line sync">…</div>
     <canvas class="prev hidden" width="290" height="34"></canvas>
     <div class="meter"><i></i></div>
+    <div class="line"><span class="snd">🎧 …</span> <button data-a="sndtest" title="Tester les sons">▶</button></div>
     <div class="row">
       <button data-a="calib" class="hot" title="Montre à GoonFap où est la barre rythmo">🎯 Caler sur la barre rythmo</button>
-      <button data-a="source" title="Basculer barre rythmo / son">🎵</button>
+      <button data-a="source" title="Ce que GoonFap suit : auto / funscript / barre rythmo / son">🎵</button>
+      <button data-a="loadfs" title="Charger un fichier .funscript">📂</button>
     </div>
     <div class="row">
       <span class="lbl" title="Puissance">💪</span><button data-a="down">−</button><span class="val pw">100%</span><button data-a="up">+</button>
@@ -155,7 +166,7 @@
     if (now - lastGif < 2500 && n === 1) return;
     lastGif = now;
     // Les GIF évitent la barre rythmo (sinon ils fausseraient la détection)
-    const avoidTop = S.source === 'visual' && laneNow ? laneNow.y / innerHeight : 0.82;
+    const avoidTop = src() === 'visual' && laneNow ? laneNow.y / innerHeight : 0.82;
     for (let i = 0; i < n; i++) setTimeout(() => gifFrame.contentWindow && gifFrame.contentWindow.postMessage({ gf: 'show', avoidTop, size: S.gifSize, dur: S.gifDur * 1000 }, '*'), i * 400);
   }
   window.addEventListener('message', e => {
@@ -181,7 +192,7 @@
     if (now < st.muteUntil) return false;
     // anti-doublon : jamais deux vibrations trop rapprochées
     const recent = st.iv.slice(-3);
-    const minGap = Math.max(35, recent.length >= 2 ? Math.min(...recent) * 0.3 : 35);
+    const minGap = Math.max(35, recent.length >= 2 ? Math.min(...recent) * 0.45 : 35);
     if (now - st.lastFire < minGap) return false;
     const gap = Math.min(now - st.lastFire, recent.length ? median(recent) : 1000);
     st.lastFire = now;
@@ -196,7 +207,7 @@
     st.flash = 1;
     st.hits.push(now);
     host.dataset.fires = (+(host.dataset.fires || 0) + 1);
-    try { if (localStorage.getItem('gfDebug')) host.dataset.ft = (host.dataset.ft ? host.dataset.ft + ',' : '') + Math.round(now); } catch (e) {}
+    try { if (localStorage.getItem('gfDebug')) { const dv = mainVideo(); host.dataset.ft = (host.dataset.ft ? host.dataset.ft + ',' : '') + Math.round(now); host.dataset.fv = (host.dataset.fv ? host.dataset.fv + ',' : '') + (dv ? Math.round(videoMs(dv)) : -1); } } catch (e) {}
     send({ type: 'beat' });
     return true;
   }
@@ -225,7 +236,7 @@
 
   // ----- Source "son" : chaque attaque sonore -----
   function onOnset(s, at) {
-    if (S.source !== 'audio') return;
+    if (src() !== 'audio') return;
     const now = performance.now();
     const audioMs = at != null ? at * 1000 : now;
     st.lastS = s;
@@ -250,10 +261,10 @@
   // On regroupe ces estimations par instant d'arrivée : un beat planifié = un repère.
   const vis = { pend: [], fired: [], ok: null, prof: null };
   function onVEtas(etas) {
-    if (S.source !== 'visual' || calib) return;
+    if (src() !== 'visual' || calib) return;
     const now = performance.now();
     const recent = st.iv.slice(-3);
-    const tol = Math.max(18, Math.min(80, (recent.length ? Math.min(...recent) : 300) * 0.35));
+    const tol = Math.max(18, Math.min(120, (recent.length ? Math.min(...recent) : 300) * 0.45));
     vis.fired = vis.fired.filter(t => now - t < 1000);
     for (const eta of etas) {
       const at = now + eta - S.vOffset;
@@ -275,6 +286,113 @@
     if (vibrate(1, now)) registerBeat(now, now);
   }
   function clearPend() { vis.pend.forEach(p => clearTimeout(p.timer)); vis.pend = []; }
+
+  // ----- Source "funscript" : le fichier de mouvements de la vidéo (faptap…) -----
+  // On connaît à l'avance l'instant exact de chaque coup : synchro parfaite, rien à caler.
+  function parseFunscript(raw) {
+    let acts = (raw.actions || []).filter(a => a && isFinite(a.at) && isFinite(a.pos)).map(a => ({ at: +a.at, pos: raw.inverted ? 100 - a.pos : +a.pos }));
+    acts.sort((a, b) => a.at - b.at);
+    acts = acts.filter((a, i) => i === 0 || a.at !== acts[i - 1].at);
+    // Points de retournement : bas (fin d'un coup vers le bas) et haut
+    const beats = [];
+    for (let i = 1; i < acts.length - 1; i++) {
+      const p = acts[i - 1].pos, q = acts[i].pos, n = acts[i + 1].pos;
+      const low = q < p && q <= n, high = q > p && q >= n;
+      if (!low && !high) continue;
+      // force = amplitude du mouvement qui arrive
+      let j = i - 1; while (j > 0 && Math.sign(acts[j].pos - acts[j - 1].pos) === Math.sign(q - p)) j--;
+      const amp = Math.abs(q - acts[j].pos) / 100;
+      if (amp < 0.08) continue; // micro-mouvement
+      beats.push({ at: acts[i].at, s: Math.max(0.35, Math.min(1, amp * 1.4)), low });
+    }
+    return { acts, beats, all: beats, lows: beats.filter(b => b.low) };
+  }
+  function loadFunscript(raw, from) {
+    try {
+      const p = parseFunscript(raw);
+      if (p.all.length < 4) return;
+      fsData = { acts: p.acts, beats: S.fMode === 'both' ? p.all : p.lows, all: p.all, lows: p.lows, from };
+      fsState.next = -1;
+      if (src() === 'funscript') message(`📜 Funscript ${from === 'file' ? 'chargé' : 'trouvé sur la page'}<small>${fsData.beats.length} coups — synchro parfaite, rien à caler</small>`, 3500, { speak: false });
+    } catch (e) {}
+  }
+  const fsState = { next: -1, lastT: -1, timers: [], flowAt: 0 };
+  // Horloge précise de la vidéo : currentTime n'avance que par à-coups (une image à la fois).
+  // requestVideoFrameCallback donne l'instant exact de chaque image : on extrapole entre deux.
+  const vclock = { v: null, mt: 0, pt: 0, ok: false };
+  function videoMs(v) {
+    if (vclock.v !== v) {
+      vclock.v = v; vclock.ok = false;
+      if (v.requestVideoFrameCallback) {
+        const cb = (now, md) => { if (vclock.v !== v) return; vclock.mt = md.mediaTime * 1000; vclock.pt = md.expectedDisplayTime || now; vclock.ok = true; v.requestVideoFrameCallback(cb); };
+        v.requestVideoFrameCallback(cb);
+      }
+    }
+    const ct = v.currentTime * 1000;
+    if (vclock.ok && !v.paused) {
+      const est = vclock.mt + (performance.now() - vclock.pt) * (v.playbackRate || 1);
+      if (Math.abs(est - ct) < 250) return est;
+    }
+    return ct;
+  }
+  function fsIndex(t) { // premier coup à partir de t
+    const b = fsData.beats; let lo = 0, hi = b.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (b[m].at < t) lo = m + 1; else hi = m; }
+    return lo;
+  }
+  function fsReset() { fsState.timers.forEach(clearTimeout); fsState.timers = []; fsState.next = -1; }
+  function fsTick() {
+    if (!fsData || src() !== 'funscript' || calib) return;
+    const v = mainVideo();
+    if (!v || v.paused || v.seeking) { if (fsState.timers.length) fsReset(); return; }
+    const rate = v.playbackRate || 1;
+    const t = videoMs(v) + S.fOffset * rate;
+    if (fsState.next < 0 || t < fsState.lastT - 50 || t - fsState.lastT > 600) { fsReset(); fsState.next = fsIndex(t); } // saut dans la vidéo
+    fsState.lastT = t;
+    if (S.fMode === 'flow') { fsFlow(v, t); return; }
+    const b = fsData.beats;
+    while (fsState.next < b.length && b[fsState.next].at <= t + 60) {
+      const beat = b[fsState.next++];
+      const delay = Math.max(0, (beat.at - t) / rate);
+      const id = setTimeout(() => { fsState.timers = fsState.timers.filter(x => x !== id); const now = performance.now(); if (vibrate(beat.s, now)) registerBeat(now, now); }, delay);
+      fsState.timers.push(id);
+    }
+  }
+  // Mode continu : la vibration suit la vitesse du mouvement (comme un stroker)
+  function fsFlow(v, t) {
+    const a = fsData.acts;
+    let i = 0, lo = 0, hi = a.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (a[m].at < t) lo = m + 1; else hi = m; }
+    i = lo;
+    if (i <= 0 || i >= a.length) return;
+    const speed = Math.abs(a[i].pos - a[i - 1].pos) / Math.max(1, a[i].at - a[i - 1].at); // pos/ms
+    const mag = S.power * Math.min(1, speed / 0.5);
+    const now = performance.now();
+    if (now - fsState.flowAt > 45) { fsState.flowAt = now; if (now >= st.muteUntil) rumble(80, mag * 0.8, mag); }
+    // un coup de plus à chaque passage par le bas (pour le BPM, les pauses, la voix)
+    if (i !== fsState.flowIdx) {
+      fsState.flowIdx = i;
+      const p = a[i - 2], q = a[i - 1];
+      if (p && q.pos < p.pos && q.pos <= a[i].pos) { st.flash = 1; registerBeat(now, now); }
+    }
+  }
+  const fsLoop = setInterval(fsTick, 25);
+
+  // Funscripts repérés dans la page par fs-hook.js
+  window.addEventListener('message', e => {
+    if (e.source !== window || !e.data) return;
+    if (e.data.__gfFunscript) loadFunscript(e.data.__gfFunscript, 'page');
+    else if (e.data.__gfTry) chrome.runtime.sendMessage({ type: 'gf-fetch', url: e.data.__gfTry }).then(t => { if (t) try { loadFunscript(JSON.parse(t), 'page'); } catch (er) {} }).catch(() => {});
+  });
+  // Fichier choisi à la main
+  const fsInput = root.querySelector('.fsfile');
+  fsInput.addEventListener('change', async () => {
+    const f = fsInput.files[0];
+    if (!f) return;
+    try { loadFunscript(JSON.parse(await f.text()), 'file'); if (!fsData) throw new Error(); if (S.source !== 'auto') { S.source = 'funscript'; saveSettings(); } }
+    catch (e) { message('❌ Ce fichier n\'est pas un funscript valide', 3000, { speak: false }); }
+    fsInput.value = '';
+  });
 
   // Battements de cœur pendant les pauses
   function startTease() {
@@ -381,6 +499,13 @@
 
   // ---------- Panneau ----------
   let level = 0, sounds = null;
+  function soundsLine() {
+    if (!sounds) return '🎧 Sons : …';
+    const n = k => sounds[k] || 0;
+    const moans = n('lent') + n('moyen') + n('rapide');
+    if (!moans && !n('beat') && !n('oral') && !n('jouis')) return '🎧 Aucun son (dossier sons/ vide)';
+    return `🎧 ${n('beat')} claquements · ${n('oral')} bouche · ${moans} gémissements · ${n('jouis')} orgasmes` + (S.beatSfx ? '' : ' (bruitage par beat coupé)');
+  }
   function updatePanel(bpm, silent) {
     $('.bpm').textContent = bpm && silent < silenceLimit() ? `${Math.round(bpm)} BPM` : '— BPM';
     const p = pad();
@@ -388,22 +513,23 @@
     $('.pad').textContent = !p ? '🎮 Appuie sur un bouton de la manette pour la connecter'
       : canVibe ? '🎮 Manette prête — vibrations à fond 💓' : '🎮 Manette sans vibration dans ce navigateur (utilise Chrome/Edge)';
     let sync;
-    const visual = S.source === 'visual';
+    const mode = src(), visual = mode === 'visual', fsMode = mode === 'funscript';
     if (calib) sync = '🎯 Calibration en cours…';
     else if (performance.now() < st.muteUntil) sync = '✋ Pause « au bord »… on reprend bientôt';
     else if (visual && !S.lane) sync = '👁 Mode barre rythmo : clique sur 🎯 pour la montrer à GoonFap';
     else if (visual && vis.ok === false) sync = '❌ Capture de l\'image impossible ici — passe en mode 🎵';
     else if (st.inPause) sync = '✋ Pause' + (S.tease ? ' — battements de cœur 💓' : '');
-    else if (!st.beats || silent > silenceLimit()) sync = visual ? '👁 J\'attends que les repères bougent… lance la vidéo ▶' : '🎵 En attente du rythme… lance la vidéo ▶';
-    else sync = visual ? '👁 Calé sur la barre rythmo 🔒' : (st.locked ? '🎵 Calé sur le tempo du son 🔒' : '🎵 Suit chaque beat du son');
+    else if (!st.beats || silent > silenceLimit()) sync = fsMode ? `📜 Funscript chargé (${fsData.beats.length} coups) — lance la vidéo ▶` : visual ? '👁 J\'attends que les repères bougent… lance la vidéo ▶' : '🎵 En attente du rythme… lance la vidéo ▶';
+    else sync = fsMode ? '📜 Calé sur le funscript de la vidéo 🔒' : visual ? '👁 Calé sur la barre rythmo 🔒' : (st.locked ? '🎵 Calé sur le tempo du son 🔒' : '🎵 Suit chaque beat du son');
     $('.sync').textContent = sync;
     $('.pw').textContent = Math.round(S.power * 100) + '%';
-    $('.off').textContent = (visual ? S.vOffset : S.offset) + ' ms';
-    $('[data-a="source"]').textContent = visual ? '👁 Barre' : '🎵 Son';
+    $('.off').textContent = (fsMode ? S.fOffset : visual ? S.vOffset : S.offset) + ' ms';
+    $('[data-a="source"]').textContent = (S.source === 'auto' ? 'Auto : ' : '') + (fsMode ? '📜 Script' : visual ? '👁 Barre' : '🎵 Son');
+    $('.snd').textContent = soundsLine();
     $('[data-a="voice"]').classList.toggle('on', !!S.voice);
     $('[data-a="gifs"]').classList.toggle('on', !!S.gifs);
     $('[data-a="gifs"]').title = gifCount ? `GIF on/off (${gifCount} GIF)` : 'Aucun GIF : mets-en dans le dossier gifs/ de l\'extension';
-    $('.meter').classList.toggle('hidden', visual);
+    $('.meter').classList.toggle('hidden', mode !== 'audio');
     prev.classList.toggle('hidden', !visual || !S.lane);
     $('.meter i').style.width = Math.min(100, level * 40) + '%';
   }
@@ -424,7 +550,7 @@
     requestAnimationFrame(draw);
     const now = performance.now();
     st.flash *= 0.86;
-    const visual = S.source === 'visual';
+    const visual = src() === 'visual';
     // En mode barre rythmo, pas de lueur ni de piste : elles fausseraient la capture de l'image
     vignette.style.opacity = visual ? '0' : (st.flash * 0.9).toFixed(3);
     $('.heart').style.transform = `scale(${1 + st.flash * 0.5})`;
@@ -444,7 +570,18 @@
     if (st.flash > 0.05) { cx.fillStyle = `rgba(255,61,154,${st.flash * 0.6})`; cx.fill(); }
     st.hits = st.hits.filter(t => now - t < 1500);
     for (const t of st.hits) heart(tx - (now - t) * pps, cy, 16, `rgba(255,134,194,${1 - (now - t) / 1500})`);
-    if (st.locked && !st.inPause) {
+    if (src() === 'funscript' && fsData) { // on connaît l'avenir : les vrais coups à venir
+      const v = mainVideo();
+      if (v) {
+        const t = videoMs(v), rate = v.playbackRate || 1;
+        let i = fsIndex(t);
+        for (; i < fsData.beats.length; i++) {
+          const b = fsData.beats[i], dtm = (b.at - t) / rate;
+          if (dtm > look) break;
+          heart(tx + dtm * pps, cy, 12 + 8 * b.s, '#ff3d9a');
+        }
+      }
+    } else if (st.locked && !st.inPause) {
       for (let k = 1; ; k++) {
         const t = st.last + k * st.period;
         if (t - now > look) break;
@@ -476,49 +613,43 @@
     const s = Math.min(r.width / vw, r.height / vh), w = vw * s, h = vh * s;
     return { x: r.left + (r.width - w) / 2, y: r.top + (r.height - h) / 2, w, h };
   }
-  // Plein écran GoonFap : on met en plein écran le LECTEUR du site (le bloc qui entoure la vidéo),
-  // et on force la vidéo à remplir l'écran. Les contrôles du site restent utilisables.
-  let imm = null; // { wrap, chain:[], v, fallback }
-  function playerWrapper(v) {
-    const vr = v.getBoundingClientRect(), va = Math.max(1, vr.width * vr.height);
-    let best = null;
-    for (let p = v.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
-      const r = p.getBoundingClientRect();
-      if (r.width * r.height > va * 2.2 + 1) break; // trop grand : ce n'est plus le lecteur
-      best = p;
-    }
-    return best;
-  }
+  // Plein écran GoonFap : la PAGE passe en plein écran (ce que le navigateur accepte toujours) et la vidéo
+  // est plaquée par-dessus tout le reste. Les ancêtres de la vidéo sont neutralisés (transform, filter…)
+  // sinon ils l'enfermeraient dans le cadre du lecteur. Les contrôles natifs de la vidéo sont affichés.
+  let imm = null; // { v, anc:[], hadControls }
   async function toggleImmersive() {
     if (imm) { if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); exitImmersive(); return; }
     const v = mainVideo();
     if (!v) { message('Aucune vidéo trouvée sur cette page 🤔', 2500, { speak: false }); return; }
-    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-    const wrap = playerWrapper(v);
-    if (wrap) {
-      const chain = [];
-      for (let p = v.parentElement; p && p !== wrap; p = p.parentElement) chain.push(p);
-      imm = { wrap, chain, v };
-      wrap.classList.add('gf-fs'); chain.forEach(e => e.classList.add('gf-fs-chain')); v.classList.add('gf-fs-video');
-      try { await wrap.requestFullscreen({ navigationUI: 'hide' }); return; } catch (e) { exitImmersive(); }
-    }
-    // Secours : vidéo plaquée sur toute la page, page en plein écran
-    imm = { v, fallback: true, chain: [] };
+    const anc = [];
+    for (let p = v.parentElement; p && p !== document.documentElement; p = p.parentElement) anc.push(p);
+    imm = { v, anc, hadControls: v.controls };
+    anc.forEach(e => e.classList.add('gf-fs-anc'));
     v.classList.add('gf-immersive-video');
-    document.documentElement.requestFullscreen().catch(() => exitImmersive());
+    v.controls = true;
+    const req = document.fullscreenElement ? Promise.resolve() : document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    req.catch(() => message('Le navigateur a refusé le plein écran — appuie sur F11 😉', 3500, { speak: false }));
+    if (host.parentNode !== document.documentElement) document.documentElement.appendChild(host);
+    panel.classList.add('dim');
+    // vérification : la vidéo couvre-t-elle bien l'écran ?
+    setTimeout(() => {
+      if (!imm) return;
+      const r = v.getBoundingClientRect();
+      if (r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) message('Le site bloque l\'agrandissement de la vidéo 😕<small>Essaie son propre bouton plein écran : GoonFap s\'y glisse aussi</small>', 4500, { speak: false });
+    }, 600);
   }
   function exitImmersive() {
     if (!imm) return;
-    if (imm.wrap) imm.wrap.classList.remove('gf-fs');
-    imm.chain.forEach(e => e.classList.remove('gf-fs-chain'));
-    imm.v.classList.remove('gf-fs-video', 'gf-immersive-video');
+    imm.anc.forEach(e => e.classList.remove('gf-fs-anc'));
+    imm.v.classList.remove('gf-immersive-video');
+    imm.v.controls = imm.hadControls;
     imm = null;
-    if (host.parentNode !== document.documentElement && !document.fullscreenElement) document.documentElement.appendChild(host);
+    panel.classList.remove('dim');
   }
   const onFs = () => {
     const fe = document.fullscreenElement;
     if (!fe && imm) exitImmersive();
-    const target = fe && fe.tagName !== 'VIDEO' ? fe : document.documentElement;
+    const target = fe && fe.tagName !== 'VIDEO' && !imm ? fe : document.documentElement;
     if (host.parentNode !== target) target.appendChild(host);
     if (fe && fe.tagName === 'VIDEO') message('Utilise le bouton ⛶ de GoonFap pour garder les messages en plein écran 😉', 4000, { speak: false });
     panel.classList.toggle('dim', !!fe);
@@ -536,7 +667,7 @@
   function updateLane() {
     let msg = { type: 'lane', lane: null };
     laneNow = null;
-    if (S.source === 'visual' && S.lane && !calib) {
+    if (src() === 'visual' && S.lane && !calib) {
       const L = S.lane;
       const b = L.ref === 'video' && mainVideo() ? videoBox(mainVideo()) : { x: 0, y: 0, w: innerWidth, h: innerHeight };
       laneNow = { x: b.x + L.x * b.w, y: b.y + L.y * b.h, w: L.w * b.w, h: L.h * b.h, tx: L.tx, vw: innerWidth, vh: innerHeight };
@@ -622,8 +753,10 @@
       case 'min': panel.classList.toggle('min'); break;
       case 'down': S.power = Math.max(0.1, +(S.power - 0.1).toFixed(2)); saveSettings(); rumble(120, S.power); break;
       case 'up': S.power = Math.min(1, +(S.power + 0.1).toFixed(2)); saveSettings(); rumble(120, S.power); break;
-      case 'early': if (S.source === 'visual') S.vOffset = Math.min(400, S.vOffset + 10); else S.offset = Math.min(200, S.offset + 10); saveSettings(); break;
-      case 'late': if (S.source === 'visual') S.vOffset = Math.max(-100, S.vOffset - 10); else S.offset = Math.max(0, S.offset - 10); saveSettings(); break;
+      case 'early': { const m = src(); if (m === 'funscript') S.fOffset = Math.min(400, S.fOffset + 10); else if (m === 'visual') S.vOffset = Math.min(400, S.vOffset + 10); else S.offset = Math.min(200, S.offset + 10); saveSettings(); break; }
+      case 'late': { const m = src(); if (m === 'funscript') S.fOffset = Math.max(-200, S.fOffset - 10); else if (m === 'visual') S.vOffset = Math.max(-100, S.vOffset - 10); else S.offset = Math.max(0, S.offset - 10); saveSettings(); break; }
+      case 'loadfs': fsInput.click(); break;
+      case 'sndtest': send({ type: 'test-sounds' }); break;
       case 'play': { const v = mainVideo(); if (v) v.paused ? v.play().catch(() => {}) : v.pause(); break; }
       case 'immersive': toggleImmersive(); break;
       case 'track': S.track = !S.track; saveSettings(); break;
@@ -631,8 +764,12 @@
       case 'gifs': S.gifs = !S.gifs; saveSettings(); if (S.gifs) showGif(); break;
       case 'calib': startCalib(); break;
       case 'source':
-        S.source = S.source === 'visual' ? 'audio' : 'visual'; saveSettings();
-        if (S.source === 'visual' && !S.lane) startCalib();
+        { const order = ['auto', 'funscript', 'visual', 'audio'];
+          S.source = order[(order.indexOf(S.source) + 1) % order.length];
+          if (S.source === 'funscript' && !fsData) S.source = 'visual';
+          saveSettings();
+          message({ auto: 'Auto : funscript, sinon barre rythmo, sinon le son', funscript: 'Je suis le funscript 📜', visual: 'Je suis la barre rythmo 👁', audio: 'Je suis le son 🎵' }[S.source], 2200, { speak: false });
+          if (S.source === 'visual' && !S.lane) startCalib(); }
         break;
       case 'edge':
         st.muteUntil = now + 15000; stopRumble(); clearTimeout(st.timer);
@@ -661,12 +798,17 @@
       switch (m.type) {
         case 'onset': onOnset(m.s, m.at); break;
         case 'vetas': onVEtas(m.etas); break;
+        case 'snd-test': message(m.ok ? '🎧 Tu dois entendre un claquement puis un orgasme' : '🎧 Aucun son trouvé : dézippe ton pack dans extension/sons/ puis recharge l\'extension', 4000, { speak: false }); break;
         case 'vprof': vis.prof = m; drawPreview(); break;
         case 'vision': vis.ok = m.ok; break;
         case 'picked': onPicked(m.color); break;
         case 'level': level = m.level; break;
         case 'sounds': sounds = m.sounds; break;
-        case 'hello': if (m.sounds) sounds = m.sounds; sendSettings(); laneSent = ''; updateLane(); break;
+        case 'hello':
+          if (m.sounds) sounds = m.sounds;
+          sendSettings(); laneSent = ''; updateLane();
+          chrome.storage.local.get('soundIndex').then(r => { if (r.soundIndex) send({ type: 'sound-index', files: r.soundIndex }); });
+          break;
       }
     });
     port.onDisconnect.addListener(() => { port = null; if (alive) retry = setTimeout(connect, 1000); });
@@ -675,14 +817,16 @@
   function sendSettings() {
     send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
   }
-  function onSettings() { sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }
+  function onSettings() {
+    if (fsData) { const nb = S.fMode === 'both' ? fsData.all : fsData.lows; if (nb !== fsData.beats) { fsData.beats = nb; fsReset(); } }
+    sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }
 
   chrome.runtime.onMessage.addListener(m => { if (m.type === 'gf-remove') remove(); });
 
   function remove() {
     if (!alive) return;
     alive = false;
-    clearInterval(slow); clearTimeout(st.timer); clearTimeout(st.missTimer); clearTimeout(retry); stopTease(); stopRumble();
+    clearInterval(slow); clearInterval(fsLoop); fsReset(); clearTimeout(st.timer); clearTimeout(st.missTimer); clearTimeout(retry); stopTease(); stopRumble();
     clearPend();
     exitImmersive();
     document.removeEventListener('fullscreenchange', onFs);
@@ -697,6 +841,6 @@
   requestAnimationFrame(draw);
   setTimeout(() => {
     if (!alive) return;
-    talk('start', 3500, { small: S.source === 'visual' && S.lane ? 'Lance la vidéo : je suis la barre rythmo' : 'Clique sur 🎯 pour caler les vibrations sur la barre rythmo de la vidéo' });
+    talk('start', 3500, { small: fsData ? 'Funscript trouvé : je suis chaque coup de la vidéo' : src() === 'visual' ? 'Lance la vidéo : je suis la barre rythmo' : 'Pas de funscript trouvé : 📂 pour en charger un, ou 🎯 pour caler sur une barre rythmo' });
   }, 300);
 })();

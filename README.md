@@ -18,12 +18,24 @@ Elle affiche par-dessus le site les messages, les GIF et les boutons. Elle te pa
 
 Après avoir ajouté des GIF ou des sons, clique sur la flèche **Recharger** de GoonFap dans `chrome://extensions`.
 
+### Funscript : la synchro parfaite (faptap.net…)
+
+Beaucoup de vidéos FapHero ont un **funscript**, le fichier de mouvements des sex-toys connectés. Sur faptap.net, c'est la ligne en relief au-dessus de la barre de progression.
+GoonFap le **détecte tout seul** sur la page et vibre sur chaque coup du script. Il n'y a rien à caler : il connaît l'avenir, et la piste en bas montre les coups à venir.
+
+- Le panneau affiche « 📜 Calé sur le funscript de la vidéo ».
+- S'il n'en trouve pas, recharge la page une fois. GoonFap surveille ensuite ce site dès le chargement.
+- Tu peux aussi charger un `.funscript` téléchargé, avec le bouton **📂** du panneau.
+- Dans le popup, choisis : un coup à chaque descente, à chaque descente **et** montée, ou une vibration **continue** qui suit la vitesse du mouvement.
+
+Par défaut, la source est sur **Auto** : le funscript s'il y en a un, sinon la barre rythmo calée avec 🎯, sinon le son. Le bouton de source du panneau permet de forcer un mode.
+
 ### Utiliser
 
 1. Branche la manette et appuie sur un bouton.
 2. Ouvre la vidéo FapHero, clique sur l'icône GoonFap puis **▶ Lancer sur cet onglet**.
 3. Passe en plein écran avec **⛶** dans le panneau GoonFap.
-4. Clique sur **🎯 Caler sur la barre rythmo**. La vidéo se met en pause et il y a 3 clics à faire :
+4. **Seulement si la vidéo n'a pas de funscript** et qu'elle a une barre rythmo à l'image : clique sur **🎯 Caler sur la barre rythmo**. La vidéo se met en pause et il y a 3 clics à faire :
    1. trace un rectangle autour de la barre rythmo ;
    2. clique sur un repère (un losange) pour que GoonFap retienne sa couleur ;
    3. clique sur la zone de frappe (là où les repères doivent tomber).
@@ -59,8 +71,8 @@ Le panneau permet aussi de :
 
 ### Plein écran
 
-Le bouton **⛶** du panneau met en plein écran le **lecteur du site**, et la vidéo remplit tout l'écran. Les messages, GIF et vibrations restent actifs.
-Si tu utilises le plein écran du site, GoonFap se glisse dedans aussi.
+Le bouton **⛶** du panneau passe la page en plein écran et plaque la vidéo sur tout l'écran, avec ses contrôles (lecture, avance, volume). Les messages, GIF et vibrations restent actifs.
+Si tu utilises le plein écran du site, GoonFap se glisse dedans aussi. Si un site bloque tout, **F11** marche toujours.
 
 ### Tes GIF : dossier `extension/gifs/`
 
@@ -80,6 +92,17 @@ GoonFap en affiche sur les côtés de l'écran pendant la séance, jamais sur la
 | *Moan* (sans précision) | Gémissements, tempo moyen |
 | *Moan*… *High* / *Intense* | Gros gémissements, tempo rapide |
 | *Materials*, *Body Noises* | Ignorés |
+
+**Vérifier :**
+
+- la ligne 🎧 du panneau indique combien de claquements, sons de bouche, gémissements et orgasmes ont été trouvés ;
+- le bouton **▶** à côté joue un son de test.
+
+Si tout est à 0 :
+
+1. vérifie que les fichiers sont bien **dans** `extension/sons/` (et pas encore dans un `.zip`) ;
+2. clique **Recharger** sur GoonFap dans `chrome://extensions` ;
+3. ouvre le popup une fois.
 
 Tu peux aussi ranger toi-même un son dans un sous-dossier : `lent/`, `moyen/`, `rapide/`, `beat/`, `oral/`, `jouis/`, `stop/`, `reprise/`, `bord/`, `debut/` ou `taquin/`.
 Le popup affiche combien de sons ont été trouvés dans chaque catégorie.

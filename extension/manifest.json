@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GoonFap — FapHero DualShock (18+)",
   "short_name": "GoonFap",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "18+ : fait vibrer ta manette PS4 au rythme des vidéos FapHero sur n'importe quel site et affiche des messages coquins par-dessus.",
   "minimum_chrome_version": "116",
   "permissions": [

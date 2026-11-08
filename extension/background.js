@@ -23,19 +23,30 @@ async function ensureOffscreen() {
 
 // Styles du plein écran GoonFap (classes posées par content.js uniquement pendant le plein écran)
 const FS_CSS = `
-.gf-fs:fullscreen{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;background:#000!important;padding:0!important;margin:0!important;transform:none!important}
-.gf-fs .gf-fs-chain{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-height:0!important;padding:0!important;margin:0!important;top:0!important;left:0!important;transform:none!important;aspect-ratio:auto!important}
-.gf-fs .gf-fs-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:contain!important;transform:none!important;margin:0!important}
-.gf-immersive-video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483646!important;background:#000!important;object-fit:contain!important;transform:none!important;margin:0!important}`;
+.gf-fs-anc{transform:none!important;filter:none!important;backdrop-filter:none!important;perspective:none!important;contain:none!important;will-change:auto!important;clip-path:none!important;mask:none!important;z-index:2147483646!important;opacity:1!important}
+.gf-immersive-video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483646!important;background:#000!important;object-fit:contain!important;transform:none!important;margin:0!important;padding:0!important;visibility:visible!important;display:block!important}`;
 
 async function inject(tabId) {
   await chrome.scripting.insertCSS({ target: { tabId }, css: FS_CSS });
   await chrome.scripting.executeScript({ target: { tabId }, files: ['common.js', 'content.js'] });
+  // Détecteur de funscripts dans la page (monde MAIN), et dès le chargement pour les prochaines visites de ce site
+  await chrome.scripting.executeScript({ target: { tabId }, files: ['fs-hook.js'], world: 'MAIN' }).catch(() => {});
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    const origin = new URL(tab.url).origin;
+    if (/^https?:/.test(origin)) {
+      const id = 'gf-hook-' + origin.replace(/[^a-z0-9]/gi, '_');
+      const exists = await chrome.scripting.getRegisteredContentScripts({ ids: [id] });
+      if (!exists.length) {
+        await chrome.scripting.registerContentScripts([{ id, matches: [origin + '/*'], js: ['fs-hook.js'], world: 'MAIN', runAt: 'document_start', persistAcrossSessions: true }]);
+      }
+    }
+  } catch (e) { /* page spéciale : pas grave */ }
 }
 
 async function settings() {
   const { settings: s } = await chrome.storage.local.get('settings');
-  return Object.assign({}, GF.DEFAULTS, s || {});
+  return Object.assign({}, GF.DEFAULTS, GF.migrate(s));
 }
 
 async function start(tabId, testUrl) {
@@ -46,9 +57,10 @@ async function start(tabId, testUrl) {
   await setState({ active: true, tabId });
   await inject(tabId);
   const s = await settings();
+  const { soundIndex } = await chrome.storage.local.get('soundIndex');
   const res = await chrome.runtime.sendMessage(testUrl
-    ? { target: 'offscreen', type: 'start-url', url: testUrl, settings: s }
-    : { target: 'offscreen', type: 'start', streamId, settings: s });
+    ? { target: 'offscreen', type: 'start-url', url: testUrl, settings: s, soundIndex: soundIndex || [] }
+    : { target: 'offscreen', type: 'start', streamId, settings: s, soundIndex: soundIndex || [] });
   if (!res || !res.ok) { await stop(); throw new Error(res ? res.error : 'capture impossible'); }
 }
 
@@ -73,6 +85,10 @@ chrome.runtime.onMessage.addListener((msg, sender, send) => {
   if (msg.type === 'gf-status') { getState().then(send); return true; }
   if (msg.type === 'gf-say') { speak(msg.text, msg.opts || {}); return; }
   if (msg.type === 'gf-hush') { chrome.tts.stop(); return; }
+  if (msg.type === 'gf-fetch') { // funscript sur un autre domaine : l'extension a le droit de le lire
+    fetch(msg.url, { credentials: 'include' }).then(r => r.text()).then(t => send(t.length < 30e6 && t.includes('"actions"') ? t : null)).catch(() => send(null));
+    return true;
+  }
   if (msg.type === 'gf-voices') { voices().then(v => send(v)); return true; }
 });
 
