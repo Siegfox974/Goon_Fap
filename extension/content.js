@@ -195,7 +195,7 @@
     if (src() === 'visual' && laneNow) bottom = Math.max(0, innerHeight - laneNow.y + 8); // jamais sur la barre rythmo
     Object.assign(compFrame.style, { width: w + 'px', height: h + 'px', bottom: bottom + 'px', left: S.compSide === 'droite' ? 'auto' : '0', right: S.compSide === 'droite' ? '0' : 'auto' });
   }
-  function compCfg(reset) { toComp({ type: 'cfg', cfg: { nude: S.compNude, frame: S.compFrame, scene: S.compScene, view: S.compView }, reset }); placeComp(); }
+  function compCfg(reset) { toComp({ type: 'cfg', cfg: { nude: S.compNude, frame: S.compFrame, scene: S.compScene, view: S.compView, anim: S.compAnim || '' }, reset }); placeComp(); }
   const STRIP_LINES = ['Tu veux voir la suite ? Mmh… 😈', 'Regarde bien… je l\'enlève pour toi.', 'Ça te plaît ? Branle-toi en me regardant.', 'Encore un peu plus nue pour toi…'];
   window.addEventListener('message', e => {
     if (e.source !== compFrame.contentWindow || !e.data || e.data.gf !== 'compagne') return;
@@ -1085,11 +1085,12 @@
   function sendSettings() {
     send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, cumSnd: S.cumSnd, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
   }
-  let compModelLoaded = null;
+  let compModelLoaded = null, compAnimsLoaded = null;
   function onSettings() {
     // changement de modèle : on recharge la compagne
-    if (compModelLoaded !== null && S.compModel !== compModelLoaded) { comp.ok = false; comp.ready = false; compFrame.src = chrome.runtime.getURL('compagne/compagne.html') + '?m=' + Date.now(); placeComp(); }
-    compModelLoaded = S.compModel;
+    const animKey = JSON.stringify(S.animScenes || {});
+    if (compModelLoaded !== null && (S.compModel !== compModelLoaded || animKey !== compAnimsLoaded)) { comp.ok = false; comp.ready = false; compFrame.src = chrome.runtime.getURL('compagne/compagne.html') + '?m=' + Date.now(); placeComp(); }
+    compModelLoaded = S.compModel; compAnimsLoaded = animKey;
     if (typeof compCfg === 'function' && comp.ok) compCfg(false);
     if (fsData) { const nb = fsPick(); if (nb !== fsData.beats) { fsData.beats = nb; fsReset(); } }
     sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }

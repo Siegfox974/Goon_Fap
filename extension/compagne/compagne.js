@@ -12,7 +12,7 @@ import { loadPmx, loadVmdFor } from './pmxrig.js';
 
 // nude : 'nue' | 'strip' | 'habillee' ; frame : 'buste' | 'entiere'
 // scene : 'auto' | 'danse' | 'masturbation' | 'fellation' ; view : 'pov' | 'cote'
-const cfg = { nude: 'strip', frame: 'buste', scene: 'auto', view: 'pov', model: '' };
+const cfg = { nude: 'strip', frame: 'buste', scene: 'auto', view: 'pov', model: '', anim: '', animScenes: {} };
 const st = { e: 0, phase: 0, lastBeat: 0, period: 600, mood: 'warm', state: 'play', talkUntil: 0, cumUntil: 0, stage: 0,
   pos: null, posAt: 0, scene: 'danse', sceneSince: 0 };
 let M = null, F = null, R = null;            // mesures du modèle, fellation (sexe masculin), chevauche (gode)
@@ -27,7 +27,11 @@ const post = m => parent.postMessage(Object.assign({ gf: 'compagne' }, m), '*');
 
 // Modèles disponibles : .vrm ou .pmx (MMD, avec ses textures dans le même dossier)
 async function findModel() {
-  try { const r = await chrome.storage.local.get('settings'); if (r.settings && r.settings.compModel) cfg.model = r.settings.compModel; } catch (e) {}
+  try {
+    const r = await chrome.storage.local.get('settings');
+    if (r.settings && r.settings.compModel) cfg.model = r.settings.compModel;
+    if (r.settings && r.settings.animScenes) cfg.animScenes = r.settings.animScenes; // scènes choisies à la main dans le popup
+  } catch (e) {}
   const files = (await GF.listDir('modele')).filter(f => /\.(vrm|pmx)$/i.test(f));
   const want = files.find(f => f === cfg.model);
   return want || files[0] || null;
@@ -93,18 +97,19 @@ function stripMore(why) {
 }
 
 // ---------- Animations d'artistes (.vrma, dossier animations/) ----------
+const sceneOf = f => { const m = cfg.animScenes[f]; return m === 'ignorer' ? null : (m || SCENE_OF(f)); };
 const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbation' : /blow|fella|suck|bj|oral|pipe/i.test(f) ? 'fellation'
   : /ride|riding|chevauch|dildo|gode|cowgirl/i.test(f) ? 'chevauche' : /twerk/i.test(f) ? 'twerk' : /dance|danse|idle|tease|strip/i.test(f) ? 'danse' : null;
 async function loadAnims(loader) {
   const all = await GF.listDir('animations');
   // animations MMD (.vmd)
-  const ignored = all.filter(x => /\.(vmd|vrma)$/i.test(x) && !SCENE_OF(x));
+  const ignored = all.filter(x => /\.(vmd|vrma)$/i.test(x) && !sceneOf(x) && cfg.animScenes[x] !== 'ignorer');
   if (ignored.length) post({ type: 'anim-ignored', files: ignored.map(f => f.split('/').pop()) });
   for (const f of all.filter(x => /\.vmd$/i.test(x))) {
-    const sc = SCENE_OF(f); if (!sc) continue;
+    const sc = sceneOf(f); if (!sc) continue;
     try {
       const buf = await (await fetch(chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/')))).arrayBuffer();
-      const clip = VMD.parseVmd(buf); clip.name = f.split('/').pop();
+      const clip = VMD.parseVmd(buf); clip.name = f.split('/').pop(); clip.path = f;
       if (vrm.isPmx) clip.pmxClip = await loadVmdFor(vrm, chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/'))); // lecture native
       (anims[sc] = anims[sc] || []).push({ vmd: clip });
     } catch (e) { post({ type: 'anim-error', file: f, error: String(e && e.message || e) }); }
@@ -114,7 +119,7 @@ async function loadAnims(loader) {
   if (!files.length || vrm.isPmx) return; // .vrma : modèles VRM seulement
   const l = new GLTFLoader(); l.register(p => new VRMAnimationLoaderPlugin(p));
   for (const f of files) {
-    const sc = SCENE_OF(f); if (!sc) continue;
+    const sc = sceneOf(f); if (!sc) continue;
     try {
       const g = await l.loadAsync(chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/')));
       const va = g.userData.vrmAnimations && g.userData.vrmAnimations[0];
@@ -170,8 +175,15 @@ function setupVmdProp(sc, clip) {
 
 // ---------- Choix de la scène ----------
 const naked = () => cfg.nude === 'nue' || st.stage >= wear.length;
+// animation choisie à la main (bouton ▶ du popup) : sa scène, et elle seule
+function forcedAnim() {
+  if (!cfg.anim) return null;
+  for (const [sc, list] of Object.entries(anims)) { const a = list.find(x => x.vmd && x.vmd.path === cfg.anim); if (a) return { sc, clip: a.vmd }; }
+  return null;
+}
 function wantedScene(now) {
   if (!licenceOk) return 'danse';
+  const fa = forcedAnim(); if (fa) return fa.sc;
   if (cfg.scene !== 'auto') return cfg.scene;
   if (st.state === 'pause' || st.state === 'edge') return st.scene === 'danse' ? 'danse' : st.scene; // elle se fige, la moue aux lèvres
   if (cfg.nude === 'habillee' || !naked()) return 'danse';                                           // d'abord le strip-tease
@@ -238,7 +250,8 @@ function switchScene(sc) {
   st.scene = sc; st.sceneSince = performance.now(); resetPhys = true;
   if (sc !== 'danse' && cfg.nude !== 'habillee' && !naked()) { st.stage = wear.length; applyWear(); } // elle se met nue pour ça
   const vlist = (anims[sc] || []).filter(a => a.vmd);
-  vmdCur = vlist.length ? vlist[Math.floor(Math.random() * vlist.length)].vmd : null; vmdTime = 0;
+  const fa = forcedAnim();
+  vmdCur = fa && fa.sc === sc ? fa.clip : vlist.length ? vlist[Math.floor(Math.random() * vlist.length)].vmd : null; vmdTime = 0;
   Object.values(anims).flat().forEach(a => { if (a.vmd && a.vmd.prop) a.vmd.prop.group.visible = false; });
   if (vmdCur) { setupVmdProp(sc, vmdCur); if (vmdCur.prop) vmdCur.prop.group.visible = true; }
   if (!vmdCur && sc === 'fellation' && !F) F = P.setupFellation(vrm, M, scene);
@@ -453,8 +466,10 @@ addEventListener('message', e => {
   const m = e.data; if (!m || m.gf !== 'c') return;
   switch (m.type) {
     case 'cfg':
+      const prevAnim = cfg.anim;
       Object.assign(cfg, m.cfg);
       if (!licenceOk) cfg.nude = 'habillee';
+      if (vrm && cfg.anim !== prevAnim) { const fa = forcedAnim(); if (fa) { st.scene = null; st.sceneSince = 0; switchScene(fa.sc); } } // ▶ : tout de suite
       if (m.cfg.nude === 'strip' && m.reset) st.stage = 0;
       if (vrm && cfg.scene !== 'auto' && cfg.scene !== st.scene) { st.sceneSince = 0; switchScene(cfg.scene); }
       frame(); applyWear(); break;

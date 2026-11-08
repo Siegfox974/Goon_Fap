@@ -135,6 +135,8 @@ Ces animations sont calculées par programme : crédibles, mais un peu raides.
 - Il **détecte la durée d'un cycle** du mouvement et l'accélère ou le ralentit pour qu'il tombe pile sur les beats.
 - Pour la fellation et la chevauche, le sexe ou le gode est placé d'après le mouvement réel.
 
+**Choisir toi-même :** popup → **🎬 Animations**. Chaque fichier y est listé ; tu choisis sa scène (ou « ignorer »), et **▶** la fait jouer tout de suite, en boucle, au rythme de la vidéo. « Revenir au mode auto » rend la main à GoonFap. Pas besoin de renommer les fichiers.
+
 Une animation `.vmd` ne contient que du mouvement : elle s'applique à **ton** modèle. Les modèles MMD (`.pmx`) d'Iwara ne sont pas pris en charge.
 
 GoonFap retire les vêtements et prépare une **peau nue** tout seul, en mémoire, sans modifier ton fichier : il efface ce qui est peint sur la peau (collants, culotte) et dessine aréoles, tétons et sexe aux bons endroits.

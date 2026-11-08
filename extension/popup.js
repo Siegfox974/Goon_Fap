@@ -96,7 +96,36 @@ function renderSoundList(files) {
 }
 const LABELS = { fap: 'fap', lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes féminins',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
+const SCENES = [['', "D'après le nom"], ['masturbation', 'Masturbation'], ['fellation', 'Fellation'], ['chevauche', 'Chevauche'], ['twerk', 'Twerk'], ['danse', 'Danse'], ['ignorer', 'Ignorer']];
+async function renderAnims() {
+  const files = (await listDir('animations')).filter(f => /\.(vmd|vrma)$/i.test(f));
+  const box = $('#anim-list'); box.textContent = '';
+  if (!files.length) { box.textContent = 'Aucune animation : dépose des .vmd dans extension/animations/, puis recharge l\'extension.'; return; }
+  const now = $('#anim-now');
+  const showNow = () => {
+    now.textContent = S.compAnim ? `▶ En cours : ${S.compAnim.split('/').pop()} ` : 'Mode automatique : les animations sont choisies selon la scène.';
+    if (S.compAnim) { const b = document.createElement('button'); b.className = 'small-btn'; b.textContent = 'Revenir au mode auto'; b.addEventListener('click', () => { S.compAnim = ''; chrome.storage.local.set({ settings: S }); showNow(); }); now.appendChild(b); }
+  };
+  showNow();
+  for (const f of files) {
+    const row = document.createElement('div'); row.className = 'sndrow';
+    const play = document.createElement('button'); play.textContent = '▶'; play.title = 'Jouer cette animation maintenant';
+    const sel = document.createElement('select'); sel.style.width = 'auto'; sel.style.marginTop = '0';
+    SCENES.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o); });
+    sel.value = (S.animScenes || {})[f] || '';
+    sel.addEventListener('change', () => { S.animScenes = Object.assign({}, S.animScenes, { [f]: sel.value }); if (!sel.value) delete S.animScenes[f]; chrome.storage.local.set({ settings: S }); });
+    play.addEventListener('click', () => {
+      // une animation sans scène connue est rangée en « masturbation » pour pouvoir la jouer
+      if (!sel.value && !/mastur|fap|finger|touch|rub|solo|blow|fella|suck|bj|oral|pipe|ride|riding|chevauch|dildo|gode|cowgirl|twerk|dance|danse|idle|tease|strip/i.test(f)) { sel.value = 'masturbation'; S.animScenes = Object.assign({}, S.animScenes, { [f]: 'masturbation' }); }
+      S.compAnim = f; S.compagne = true; chrome.storage.local.set({ settings: S }); showNow();
+    });
+    const name = document.createElement('span'); name.textContent = f.replace(/^animations\//, ''); name.title = f;
+    row.append(play, sel, name); box.appendChild(row);
+  }
+}
+
 async function counts() {
+  renderAnims();
   const mods = (await listDir('modele')).filter(f => /\.(vrm|pmx)$/i.test(f));
   const selM = $('#compModel');
   for (const f of mods) { if (![...selM.options].some(o => o.value === f)) { const o = document.createElement('option'); o.value = f; o.textContent = f.replace(/^modele\//, '') + (/\.pmx$/i.test(f) ? ' (MMD)' : ' (VRM)'); selM.appendChild(o); } }

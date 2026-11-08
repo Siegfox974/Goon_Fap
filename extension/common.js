@@ -9,6 +9,8 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     compSide: 'gauche',// 'gauche' | 'droite'
     compSize: 0.6,     // hauteur (fraction de l'écran)
     compModel: '',     // fichier du modèle dans modele/ ('' = le premier trouvé)
+    animScenes: {},    // scène choisie à la main pour chaque fichier d'animation (popup)
+    compAnim: '',      // animation imposée (bouton ▶ du popup), '' = automatique
     compScene: 'auto', // 'auto' | 'danse' | 'masturbation' | 'fellation' | 'chevauche' | 'twerk'
     compView: 'pov',   // 'pov' (vue subjective) | 'cote'
     cover: true,       // plein écran : l'image remplit l'écran (plus de bandes noires, bords rognés)
