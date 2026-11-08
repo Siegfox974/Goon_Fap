@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="rating" content="adult">
+  <title>Goon Fap — FapHero DualShock</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ PORTE 18+ ============ -->
+<section id="age-gate" class="screen active">
+  <div class="card gate">
+    <h1 class="logo">Goon<span>Fap</span></h1>
+    <p class="badge18">18+</p>
+    <p>Cette application est réservée aux <strong>adultes majeurs</strong>.<br>
+      Elle contient des contenus et des consignes à caractère sexuel.</p>
+    <p class="small">Tout se passe dans ton navigateur : tes vidéos ne sont jamais envoyées nulle part.</p>
+    <label class="check"><input type="checkbox" id="age-check"> J'ai 18 ans ou plus et j'accepte de voir du contenu pour adultes.</label>
+    <div class="row">
+      <button id="age-yes" class="btn primary" disabled>Entrer 😈</button>
+      <a class="btn ghost" href="https://www.google.com">Sortir</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONFIG ============ -->
+<section id="setup" class="screen">
+  <header class="topbar">
+    <h1 class="logo small-logo">Goon<span>Fap</span></h1>
+    <div id="pad-status" class="pad-status off">
+      <span class="dot"></span><span id="pad-label">Aucune manette — branche-la et appuie sur un bouton</span>
+    </div>
+  </header>
+
+  <div class="grid">
+    <!-- Manette -->
+    <div class="card">
+      <h2>🎮 Manette</h2>
+      <p class="small">DualShock 4 en USB ou Bluetooth. Navigateur conseillé : <b>Chrome</b> ou <b>Edge</b> (Firefox ne gère pas la vibration).</p>
+      <div class="row">
+        <button id="test-light" class="btn">Test doux</button>
+        <button id="test-strong" class="btn">Test fort</button>
+        <button id="test-tease" class="btn">Test « tease »</button>
+      </div>
+      <label class="range">Puissance globale <output id="o-power"></output>
+        <input type="range" id="power" min="0.1" max="1" step="0.05" value="0.8"></label>
+      <label class="range">Durée d'une pulsation (ms) <output id="o-pulse"></output>
+        <input type="range" id="pulse" min="40" max="400" step="10" value="120"></label>
+      <label class="range">Mélange moteurs (grave ↔ aigu) <output id="o-mix"></output>
+        <input type="range" id="mix" min="0" max="1" step="0.05" value="0.5"></label>
+      <label class="check"><input type="checkbox" id="phone-vibe"> Vibration du téléphone si pas de manette</label>
+      <label class="check"><input type="checkbox" id="click-sound"> Son « clic » sur chaque beat</label>
+    </div>
+
+    <!-- Source -->
+    <div class="card">
+      <h2>🎬 Vidéo</h2>
+      <p class="small">Choisis une vidéo sur ton appareil (elle reste en local) — ou joue sans vidéo, juste au rythme de la manette.</p>
+      <label class="file">
+        <input type="file" id="video-file" accept="video/*,audio/*">
+        <span id="video-name">Choisir une vidéo…</span>
+      </label>
+      <button id="clear-video" class="btn ghost hidden">Retirer la vidéo</button>
+      <p id="saved-map-hint" class="hint hidden"></p>
+    </div>
+
+    <!-- Rythme -->
+    <div class="card wide">
+      <h2>💓 Rythme</h2>
+      <div class="tabs" id="mode-tabs">
+        <button data-mode="program" class="tab active">Programme coquin</button>
+        <button data-mode="auto" class="tab">Détection auto (vidéo FapHero)</button>
+        <button data-mode="record" class="tab">Enregistrer au doigt</button>
+        <button data-mode="file" class="tab">Charger un beatmap</button>
+      </div>
+
+      <div class="tabpane active" data-pane="program">
+        <div class="presets" id="presets"></div>
+        <div class="row wrap">
+          <label class="range">Durée (minutes) <output id="o-minutes"></output>
+            <input type="range" id="minutes" min="2" max="45" step="1" value="10"></label>
+          <label class="select">Fin de séance
+            <select id="finale">
+              <option value="cum">Jouis à la fin 💦</option>
+              <option value="ruin">Orgasme ruiné 😈</option>
+              <option value="denial">Déni total 🔒</option>
+              <option value="choice">Roulette — surprise 🎲</option>
+            </select>
+          </label>
+        </div>
+        <p class="small">Si une vidéo est chargée, la durée du programme suit celle de la vidéo.</p>
+      </div>
+
+      <div class="tabpane" data-pane="auto">
+        <p>Analyse la bande son de la vidéo et transforme chaque « beat » audible en vibration. Parfait pour les vidéos FapHero avec métronome.</p>
+        <div class="row wrap">
+          <label class="range">Sensibilité <output id="o-sens"></output>
+            <input type="range" id="sens" min="0.5" max="3" step="0.1" value="1.5"></label>
+          <label class="select">Fréquences
+            <select id="band">
+              <option value="all">Tout le son</option>
+              <option value="high">Aigus (clics, claquements)</option>
+              <option value="low">Graves (kicks, basses)</option>
+            </select>
+          </label>
+          <label class="range">Écart min. entre beats (ms) <output id="o-gap"></output>
+            <input type="range" id="gap" min="80" max="600" step="10" value="180"></label>
+        </div>
+        <button id="analyze" class="btn">Analyser maintenant</button>
+        <p id="analyze-status" class="hint"></p>
+      </div>
+
+      <div class="tabpane" data-pane="record">
+        <p>La vidéo se lance, et tu tapes le rythme toi-même :
+          <b>✕ / Espace</b> = beat normal, <b>□ / B</b> = beat fort.
+          À la fin, le beatmap est sauvegardé pour cette vidéo et tu peux l'exporter.</p>
+      </div>
+
+      <div class="tabpane" data-pane="file">
+        <label class="file">
+          <input type="file" id="map-file" accept=".json,application/json">
+          <span id="map-name">Choisir un fichier .json…</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="startbar">
+    <button id="start" class="btn primary big">C'est parti 🔥</button>
+    <p class="small controls-help">
+      En jeu : <b>Options / Espace</b> pause · <b>○ / Échap</b> quitter · <b>R1/R2</b> plus fort · <b>L1/L2</b> moins fort ·
+      <b>✕ / E</b> « je suis au bord ! » (stop 15 s) · <b>△ / H</b> masquer la piste
+    </p>
+  </div>
+</section>
+
+<!-- ============ JEU ============ -->
+<section id="game" class="screen">
+  <div id="stage">
+    <video id="video" playsinline></video>
+    <div id="pulse-bg"></div>
+  </div>
+  <div id="hud-top">
+    <div id="hud-phase"></div>
+    <div id="hud-stats"><span id="hud-bpm">— BPM</span> · <span id="hud-time">0:00</span> · <span id="hud-power">100%</span></div>
+  </div>
+  <div id="message"></div>
+  <canvas id="highway"></canvas>
+  <div id="pause-overlay" class="hidden">
+    <div class="card">
+      <h2>Pause</h2>
+      <p>Reprends ton souffle… 😮‍💨</p>
+      <div class="row">
+        <button id="resume" class="btn primary">Reprendre</button>
+        <button id="quit" class="btn ghost">Quitter</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FIN ============ -->
+<section id="end" class="screen">
+  <div class="card gate">
+    <h2 id="end-title">Séance terminée</h2>
+    <p id="end-msg"></p>
+    <ul id="end-stats" class="stats"></ul>
+    <div class="row wrap">
+      <button id="again" class="btn primary">Rejouer</button>
+      <button id="export" class="btn">Exporter le beatmap</button>
+      <button id="back" class="btn ghost">Retour</button>
+    </div>
+  </div>
+</section>
+
+<script src="js/gamepad.js"></script>
+<script src="js/beatmap.js"></script>
+<script src="js/game.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
