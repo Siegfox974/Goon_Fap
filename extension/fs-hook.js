@@ -2,7 +2,7 @@
  * (faptap.net et autres) et les transmet au content script GoonFap via window.postMessage.
  * Un funscript = JSON { actions: [{ at: ms, pos: 0..100 }, …] }. Rien n'est envoyé hors de ton navigateur. */
 (() => {
-  if (window.__gfHook) { window.__gfHook.scan(); return; }
+  if (window.__gfHook) { window.__gfHook.scan(); window.__gfHook.resend(); return; }
 
   // --- Manette, côté page : second chemin pour les vibrations (au cas où GoonFap ne la voit pas de son côté) ---
   const gp = () => { try { return Array.from(navigator.getGamepads ? navigator.getGamepads() : []).find(Boolean) || null; } catch (e) { return null; } };
@@ -20,6 +20,9 @@
     window.postMessage({ __gfPad: p ? { id: p.id, vib: !!((p.vibrationActuator && p.vibrationActuator.playEffect) || (p.hapticActuators && p.hapticActuators[0])) } : { none: true } }, '*');
   }, 1000);
   const seen = new Set();
+  const found = []; // funscripts trouvés (renvoyés quand GoonFap démarre après le chargement de la page)
+  const post = s => window.postMessage({ __gfFunscript: s }, '*');
+  window.addEventListener('message', e => { if (e.source === window && e.data && e.data.__gfAsk) found.forEach(post); });
 
   function looksLikeScript(o) {
     return o && Array.isArray(o.actions) && o.actions.length > 4 &&
@@ -44,7 +47,9 @@
       const key = s.actions.length + ':' + s.actions[s.actions.length - 1].at;
       if (seen.has(key)) return;
       seen.add(key);
-      window.postMessage({ __gfFunscript: { actions: s.actions, url: String(url || ''), inverted: !!s.inverted } }, '*');
+      const item = { actions: s.actions, url: String(url || ''), inverted: !!s.inverted };
+      found.push(item); if (found.length > 5) found.shift();
+      post(item);
     } catch (e) {}
   }
 
@@ -88,7 +93,7 @@
         .catch(() => window.postMessage({ __gfTry: u }, '*'));
     }
   }
-  window.__gfHook = { scan };
+  window.__gfHook = { scan, resend: () => found.forEach(post) };
   scan();
   // Les sites qui chargent la vidéo suivante sans recharger la page
   setInterval(scan, 4000);

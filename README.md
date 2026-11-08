@@ -33,9 +33,14 @@ GoonFap le **détecte tout seul** sur la page et vibre sur chaque coup du script
 - Le panneau affiche « 📜 Calé sur le funscript de la vidéo ».
 - S'il n'en trouve pas, recharge la page une fois. GoonFap surveille ensuite ce site dès le chargement.
 - Tu peux aussi charger un `.funscript` téléchargé, avec le bouton **📂** du panneau.
+- **Si les vibrations ne tombent pas pile :** clique **👆 Caler au doigt** dans le panneau, puis tape sur 12 beats de la vidéo (clic ou Espace). GoonFap calcule le décalage exact (latence de ta manette, script décalé) et choisit s'il faut vibrer en haut ou en bas du mouvement.
 - Dans le popup, choisis : un coup à chaque descente, à chaque descente **et** montée, ou une vibration **continue** qui suit la vitesse du mouvement.
 
 Par défaut, la source est sur **Auto** : le funscript s'il y en a un, sinon la barre rythmo calée avec 🎯, sinon le son. Le bouton de source du panneau permet de forcer un mode.
+
+### Quelque chose ne marche pas ?
+
+Clique sur **🩺** dans le panneau : un rapport technique est copié dans le presse-papiers (vidéo trouvée, plein écran, manette, funscript, sons). Colle-le à la personne qui t'aide.
 
 ### La manette ne vibre pas ?
 
@@ -107,6 +112,9 @@ GoonFap en affiche sur les côtés de l'écran pendant la séance, jamais sur la
 | *Moan* (sans précision) | Gémissements, tempo moyen |
 | *Moan*… *High* / *Intense* | Gros gémissements, tempo rapide |
 | *Materials*, *Body Noises* | Ignorés |
+
+Par défaut, seuls deux sons jouent : le **bruit de fap sur chaque beat** et l'**orgasme d'elle** à la fin ou sur « Je jouis ». Les gémissements d'ambiance s'activent dans le popup.
+**Un son te dérange ?** Dans le popup, rubrique 🎧, ouvre sa catégorie, écoute chaque fichier (▶) et exclus-le (✕).
 
 **Vérifier :**
 

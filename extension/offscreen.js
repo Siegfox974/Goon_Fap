@@ -274,7 +274,7 @@ const Sounds = (() => {
   const buffers = new Map();
   let actx = null, opts = { clips: true, clipVol: 0.9, beatSfx: false, beatVol: 0.7, moans: true, beatKind: 'beat' }, current = null, cur = null, gapTimer = null;
   // Si un moment n'a pas de son, on prend le plus proche
-  const FALLBACK = { lent: ['moyen', 'rapide'], moyen: ['lent', 'rapide'], rapide: ['moyen', 'lent'], taquin: ['lent', 'oral', 'moyen'] };
+  const FALLBACK = { lent: ['moyen', 'rapide'], moyen: ['lent', 'rapide'], rapide: ['moyen', 'lent'], taquin: ['lent', 'moyen'] };
   const avail = k => (files[k] && files[k].length ? k : (FALLBACK[k] || []).find(f => files[f].length) || null);
 
   // La liste des sons est fournie par l'extension (un document offscreen ne peut pas lire son dossier)
@@ -339,7 +339,7 @@ const Sounds = (() => {
     configure(s) {
       Object.assign(opts, {
         clips: s.clips !== false, clipVol: s.clipVol ?? opts.clipVol, beatSfx: !!s.beatSfx, beatVol: s.beatVol ?? opts.beatVol,
-        moans: s.moans !== false, beatKind: s.beatKind || opts.beatKind,
+        moans: !!s.moans, beatKind: s.beatKind || opts.beatKind, cumSnd: s.cumSnd !== false,
       });
       if (!opts.clips || !opts.moans) stopCurrent();
     },
@@ -358,6 +358,8 @@ const Sounds = (() => {
     oneShot(kind) {
       const k = MAP[kind] || kind;
       if (!opts.clips || !files[k] || !files[k].length) return;
+      if (k === 'jouis' && !opts.cumSnd) return;
+      if (k !== 'jouis' && !opts.moans) return; // voix ponctuelles (stop, reprise…) seulement si les gémissements sont activés
       stopCurrent();
       play(k, opts.clipVol, () => { if (current) gapTimer = setTimeout(loopMood, 800); }).then(s => { cur = s ? { s, kind: k } : null; });
     },

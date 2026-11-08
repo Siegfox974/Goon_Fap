@@ -2,7 +2,7 @@
 /* eslint-disable no-var */
 var GF = globalThis.GF || (globalThis.GF = (() => {
   const DEFAULTS = {
-    _v: 4,
+    _v: 5,
     power: 1,          // 100 % = le max de la manette
     pulse: 140,        // ms par vibration
     source: 'auto',    // 'auto' | 'funscript' | 'visual' (barre rythmo à l'image) | 'audio' (le son)
@@ -26,7 +26,9 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     finale: 'cum',     // fin de vidéo : 'cum' | 'ruin' | 'denial' | 'off'
     beatKind: 'fap',   // bruitage sur chaque beat : 'fap' (branlette) | 'beat' (claquements) | 'oral' | 'mix'
     clips: true,       // jouer les sons du dossier sons/ quand il y en a
-    moans: true,       // ambiance : gémissements en continu selon le tempo
+    moans: false,      // ambiance : gémissements en continu selon le tempo (à activer)
+    cumSnd: true,      // son d'orgasme (féminin) quand tu jouis / à la fin
+    sndExclude: [],    // sons exclus à la main dans le popup
     clipVol: 0.9,
     beatSfx: true,     // un bruitage (claquement) sur chaque beat, s'il y a des sons
     beatVol: 0.7,
@@ -243,7 +245,9 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
   const AUDIO_RE = /\.(wav|mp3|ogg|oga|m4a|aac|flac|webm|opus)$/i;
   /** Liste les sons et l'enregistre pour le moteur audio (qui, lui, ne peut pas lire le dossier). */
   async function indexSounds() {
-    const files = (await listDir('sons')).filter(f => AUDIO_RE.test(f));
+    let excl = [];
+    try { const r = await chrome.storage.local.get('settings'); excl = (r.settings && r.settings.sndExclude) || []; } catch (e) {}
+    const files = (await listDir('sons')).filter(f => AUDIO_RE.test(f) && !excl.includes(f));
     try { await chrome.storage.local.set({ soundIndex: files }); } catch (e) {}
     return files;
   }
@@ -252,7 +256,8 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
   function migrate(s) {
     s = Object.assign({}, s || {});
     if ((s._v || 0) < 3) { s.beatSfx = true; s.source = 'auto'; }
-    if ((s._v || 0) < 4) { s.beatKind = 'fap'; s._v = 4; }
+    if ((s._v || 0) < 4) { s.beatKind = 'fap'; }
+    if ((s._v || 0) < 5) { s.moans = false; s._v = 5; }
     return s;
   }
 

@@ -39,6 +39,7 @@
       <label>Funscript : vibrer
         <select id="fMode">
           <option value="strokes">Un coup à chaque descente</option>
+          <option value="highs">Un coup à chaque montée</option>
           <option value="both">À chaque descente ET montée</option>
           <option value="flow">En continu, selon la vitesse du mouvement</option>
         </select>
@@ -88,6 +89,7 @@
       <p class="small">Dézippe ton pack de sons (ex. OpenNSFW) <b>tel quel</b> dans <code>extension/sons/</code> : GoonFap range tout seul les fichiers d'après leurs noms.</p>
       <p id="snd-count" class="small"></p>
       <label class="check"><input type="checkbox" id="clips"> Jouer les sons du dossier</label>
+      <label class="check"><input type="checkbox" id="cumSnd"> Son d'orgasme (féminin) quand tu jouis / à la fin</label>
       <label class="check"><input type="checkbox" id="moans"> Gémissements en continu selon le tempo</label>
       <label>Volume <output data-for="clipVol"></output><input type="range" id="clipVol" min="0" max="1" step="0.05"></label>
       <label class="check"><input type="checkbox" id="beatSfx"> Un bruitage sur chaque beat</label>
@@ -95,6 +97,8 @@
         <select id="beatKind"><option value="fap">Branlette mouillée (fap)</option><option value="beat">Claquements (plaps)</option><option value="oral">Bouche (slurps)</option><option value="mix">Mélange</option></select>
       </label>
       <label>Volume des bruitages <output data-for="beatVol"></output><input type="range" id="beatVol" min="0" max="1" step="0.05"></label>
+      <p class="small">Un son te dérange ? Ouvre sa catégorie, écoute (▶) et exclus-le (✕).</p>
+      <div id="snd-list"></div>
     </details>
 
     <details>

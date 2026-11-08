@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const FIELDS = ['fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
+const FIELDS = ['cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
   'voiceRate', 'voicePitch', 'clips', 'moans', 'clipVol', 'beatSfx', 'beatVol', 'gifs', 'gifEvery', 'gifDur', 'gifSize',
   'sens', 'band', 'minGap', 'predict', 'offset'];
 const NUM = new Set(['fOffset', 'power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
@@ -50,7 +50,7 @@ FIELDS.forEach(id => {
     chrome.storage.local.set({ settings: S });
   });
 });
-$('#reset').addEventListener('click', () => { const lane = S.lane; S = Object.assign({}, GF.DEFAULTS, { lane }); fill(); chrome.storage.local.set({ settings: S }); });
+$('#reset').addEventListener('click', () => { const lane = S.lane, sndExclude = S.sndExclude; S = Object.assign({}, GF.DEFAULTS, { lane, sndExclude }); fill(); chrome.storage.local.set({ settings: S }); });
 $('#voice-test').addEventListener('click', () => chrome.runtime.sendMessage({
   type: 'gf-say', text: GF.fit(GF.say('warm', S.level, S.anatomy), S.anatomy), opts: { voiceName: S.voiceName, rate: S.voiceRate, pitch: S.voicePitch },
 }));
@@ -63,6 +63,37 @@ $('#age-ok').addEventListener('click', async () => {
 });
 
 const listDir = GF.listDir;
+const urlOf = f => chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/'));
+let player = null;
+function playFile(f) { if (player) player.pause(); player = new Audio(urlOf(f)); player.play().catch(() => {}); }
+// Liste des sons par catégorie : écouter / exclure
+function renderSoundList(files) {
+  const box = $('#snd-list'); box.textContent = '';
+  const groups = {};
+  files.forEach(f => { const k = GF.classifySound(f); if (k) (groups[k] = groups[k] || []).push(f); });
+  for (const [k, list] of Object.entries(groups)) {
+    const d = document.createElement('details');
+    const sum = document.createElement('summary');
+    sum.textContent = `${LABELS[k] || k} (${list.length}) `;
+    const rnd = document.createElement('button'); rnd.className = 'small-btn'; rnd.textContent = '▶ au hasard';
+    rnd.addEventListener('click', e => { e.preventDefault(); playFile(list[Math.floor(Math.random() * list.length)]); });
+    sum.appendChild(rnd); d.appendChild(sum);
+    list.slice(0, 200).forEach(f => {
+      const row = document.createElement('div'); row.className = 'sndrow';
+      const name = document.createElement('span'); name.textContent = f.replace(/^sons\//, ''); name.title = f;
+      const pl = document.createElement('button'); pl.textContent = '▶'; pl.addEventListener('click', () => playFile(f));
+      const x = document.createElement('button'); x.textContent = '✕'; x.title = 'Ne plus jouer ce son';
+      x.addEventListener('click', async () => { S.sndExclude = (S.sndExclude || []).concat(f); await chrome.storage.local.set({ settings: S }); counts(); });
+      row.append(pl, x, name); d.appendChild(row);
+    });
+    box.appendChild(d);
+  }
+  if ((S.sndExclude || []).length) {
+    const r = document.createElement('button'); r.className = 'link'; r.textContent = `Réintégrer les ${S.sndExclude.length} son(s) exclus`;
+    r.addEventListener('click', async () => { S.sndExclude = []; await chrome.storage.local.set({ settings: S }); counts(); });
+    box.appendChild(r);
+  }
+}
 const LABELS = { fap: 'fap', lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes féminins',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
 async function counts() {
@@ -72,6 +103,7 @@ async function counts() {
   const by = {}; let ignored = 0;
   s.forEach(f => { const k = GF.classifySound(f); if (k) by[k] = (by[k] || 0) + 1; else ignored++; });
   const parts = Object.entries(by).map(([k, v]) => `${LABELS[k] || k} : ${v}`);
+  renderSoundList(s, by);
   $('#snd-count').textContent = parts.length
     ? `${s.length} sons trouvés — ` + parts.join(' · ') + (ignored ? ` · ${ignored} non utilisés (ambiances, matières…)` : '')
     : 'Aucun son : dézippe ton pack dans le dossier sons/ de l\'extension, puis recharge-la.';

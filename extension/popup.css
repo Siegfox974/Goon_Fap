@@ -22,3 +22,7 @@ select { width: 100%; margin-top: 4px; background: #1a0b1f; color: #f6e9f2; bord
 .link { background: none; border: none; color: #b99ab0; text-decoration: underline; cursor: pointer; padding: 0; }
 .small-btn { background: rgba(255,255,255,.08); color: #f6e9f2; border: 1px solid rgba(255,92,170,.35); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
 a { color: #ff86c2; }
+
+.sndrow { display: flex; gap: 4px; align-items: center; font-size: 11px; margin: 2px 0; }
+.sndrow span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cfb3c6; }
+.sndrow button { background: rgba(255,255,255,.08); color: #f6e9f2; border: 1px solid rgba(255,92,170,.3); border-radius: 6px; padding: 1px 6px; cursor: pointer; }

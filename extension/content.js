@@ -113,6 +113,11 @@
   .banner small { display: block; font-weight: 400; font-size: 12px; opacity: .85; margin-top: 4px; }
   .sel { position: fixed; border: 2px dashed #ff3d9a; pointer-events: none; }
   .tgt { position: fixed; width: 2px; background: #3dff8b; pointer-events: none; box-shadow: 0 0 8px #3dff8b; }
+  .tapzone { position: fixed; inset: 0; pointer-events: auto; cursor: pointer; background: rgba(255,61,154,.06); }
+  .tapzone.flash { background: rgba(255,61,154,.25); }
+  .diagbox { position: fixed; inset: 0; pointer-events: auto; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; }
+  .dcard { background: #1a0b1f; color: #f6e9f2; border: 2px solid #ff3d9a; border-radius: 14px; padding: 14px; width: min(92vw, 640px); font-size: 13px; }
+  .dcard textarea { width: 100%; height: 260px; margin: 8px 0; background: #000; color: #9f9; font: 11px monospace; border-radius: 8px; }
   .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; border: 1px solid #fff; margin-left: 6px; }
 </style>
 <div class="vignette"></div>
@@ -120,6 +125,8 @@
 <div class="msg"></div>
 <canvas class="track"></canvas>
 <input type="file" class="fsfile hidden" accept=".funscript,.json,application/json">
+<div class="tapzone hidden"><div class="banner"></div></div>
+<div class="diagbox hidden"><div class="dcard"><b>🩺 Diagnostic</b> — copié dans le presse-papiers. Colle-le dans ta conversation.<textarea readonly></textarea><button data-a="diagclose">Fermer</button></div></div>
 <div class="calib hidden"><div class="sel hidden"></div><div class="tgt hidden"></div><div class="banner"></div></div>
 <div class="panel">
   <div class="head">
@@ -137,6 +144,8 @@
       <button data-a="calib" class="hot" title="Montre à GoonFap où est la barre rythmo">🎯 Caler sur la barre rythmo</button>
       <button data-a="source" title="Ce que GoonFap suit : auto / funscript / barre rythmo / son">🎵</button>
       <button data-a="loadfs" title="Charger un fichier .funscript">📂</button>
+      <button data-a="tapcal" title="Caler les vibrations au doigt : tape sur 12 beats">👆 Caler au doigt</button>
+      <button data-a="diag" title="Copier un rapport de diagnostic">🩺</button>
     </div>
     <div class="row">
       <span class="lbl" title="Puissance">💪</span><button data-a="down">−</button><span class="val pw">100%</span><button data-a="up">+</button>
@@ -336,12 +345,92 @@
     try {
       const p = parseFunscript(raw);
       if (p.all.length < 4) return;
-      fsData = { acts: p.acts, beats: S.fMode === 'both' ? p.all : p.lows, all: p.all, lows: p.lows, from };
+      const highs = p.all.filter(b => !b.low);
+      fsData = { acts: p.acts, all: p.all, lows: p.lows, highs, from };
+      fsData.beats = fsPick();
       fsState.next = -1;
       if (src() === 'funscript') message(`📜 Funscript ${from === 'file' ? 'chargé' : 'trouvé sur la page'}<small>${fsData.beats.length} coups — synchro parfaite, rien à caler</small>`, 3500, { speak: false });
     } catch (e) {}
   }
   const fsState = { next: -1, lastT: -1, timers: [], flowAt: 0 };
+  function fsPick() { return S.fMode === 'both' ? fsData.all : S.fMode === 'highs' ? fsData.highs : fsData.lows; }
+
+  // ----- Calage au doigt : tu tapes sur les beats, GoonFap en déduit le décalage et le bon côté du mouvement -----
+  let tapCal = null;
+  const tapzone = root.querySelector('.tapzone'), tapBanner = tapzone.querySelector('.banner');
+  const TAPS = 12;
+  function startTapCal() {
+    const v = mainVideo();
+    if (!v) { message('Aucune vidéo trouvée sur cette page 🤔', 2500, { speak: false }); return; }
+    if (!fsData) { message('Charge d\'abord un funscript (📂), ou laisse GoonFap le trouver sur la page', 3500, { speak: false }); return; }
+    if (v.paused) v.play().catch(() => {});
+    tapCal = { taps: [], v };
+    st.muteUntil = Infinity; fsReset(); stopRumble(); // pas de vibration pendant le calage : on veut ton ressenti
+    tapzone.classList.remove('hidden');
+    tapBanner.innerHTML = `👆 Tape sur chaque beat de la vidéo — 0/${TAPS}<small>Clic n'importe où ou touche Espace, pile sur le rythme · Échap pour annuler</small>`;
+  }
+  function tap() {
+    if (!tapCal) return;
+    tapCal.taps.push(videoMs(tapCal.v));
+    tapzone.classList.add('flash'); setTimeout(() => tapzone.classList.remove('flash'), 90);
+    tapBanner.innerHTML = `👆 Tape sur chaque beat — ${tapCal.taps.length}/${TAPS}<small>Continue, bien en rythme…</small>`;
+    if (tapCal.taps.length >= TAPS) finishTapCal();
+  }
+  function endTapCal() { tapzone.classList.add('hidden'); tapCal = null; st.muteUntil = 0; fsReset(); }
+  function finishTapCal() {
+    const taps = tapCal.taps.slice(2); // les 2 premiers servent à prendre le rythme
+    const med = a => { const b = a.slice().sort((x, y) => x - y); return b[b.length >> 1]; };
+    let best = null;
+    for (const [mode, set] of [['strokes', fsData.lows], ['highs', fsData.highs], ['both', fsData.all]]) {
+      if (set.length < 4) continue;
+      const ds = [];
+      for (const t of taps) {
+        let lo = 0, hi = set.length;
+        while (lo < hi) { const m = (lo + hi) >> 1; if (set[m].at < t) lo = m + 1; else hi = m; }
+        const cand = [set[lo - 1], set[lo]].filter(Boolean);
+        const n = cand.reduce((a, b) => (Math.abs(b.at - t) < Math.abs(a.at - t) ? b : a));
+        ds.push(t - n.at);
+      }
+      const m = med(ds), spread = med(ds.map(d => Math.abs(d - m)));
+      // "both" a deux fois plus de cibles : il colle toujours un peu mieux, on le pénalise
+      // à précision égale, on préfère le plus petit décalage (sur un rythme régulier, bas+½ période ≈ haut)
+      const score = spread + 0.15 * Math.abs(m) + (mode === 'both' ? 25 : 0);
+      if (!best || score < best.score) best = { mode, m, spread, score };
+    }
+    endTapCal();
+    if (!best || best.spread > 120) { message('Pas assez régulier pour caler 😅<small>Recommence en tapant bien sur le rythme</small>', 3500, { speak: false }); return; }
+    S.fMode = best.mode;
+    S.fOffset = Math.max(-300, Math.min(400, Math.round(50 - best.m))); // 50 ms : temps de démarrage des moteurs
+    saveSettings();
+    const where = { strokes: 'en bas du mouvement', highs: 'en haut du mouvement', both: 'en haut ET en bas' }[best.mode];
+    message(`✅ Calé ! Vibrations ${where}<small>Avance réglée à ${S.fOffset} ms · précision ±${Math.round(best.spread)} ms</small>`, 4500, { speak: false });
+  }
+  tapzone.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); tap(); });
+  tapzone.addEventListener('touchstart', e => { e.preventDefault(); tap(); }, { passive: false });
+  window.addEventListener('keydown', e => {
+    if (!tapCal) return;
+    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) tap(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endTapCal(); }
+  }, true);
+
+  // ----- Diagnostic : rapport à copier-coller -----
+  function diagnostic() {
+    const v = mainVideo(), fe = document.fullscreenElement, p = pad();
+    const desc = el => el ? (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '')) : null;
+    const rep = {
+      goonfap: chrome.runtime.getManifest().version, site: location.hostname, browser: navigator.userAgent.replace(/.*(Chrome|Edg)\/(\d+).*/, '$1 $2'),
+      video: v ? { size: [Math.round(v.getBoundingClientRect().width), Math.round(v.getBoundingClientRect().height)], inShadowOrIframe: !document.contains(v), t: +v.currentTime.toFixed(2), duration: +(v.duration || 0).toFixed(1), paused: v.paused, rvfc: !!v.requestVideoFrameCallback, clock: vclock.ok, parents: (() => { const a = []; for (let q = v.parentElement; q && a.length < 4; q = q.parentElement) a.push(desc(q)); return a; })() } : null,
+      fullscreen: desc(fe), hostIn: desc(host.parentElement), popover: usePopover ? host.matches(':popover-open') : 'non', screen: [innerWidth, innerHeight],
+      pad: p ? { id: p.id, vib: !!p.vibrationActuator } : null, padPage: mainPad,
+      source: S.source, used: src(), fOffset: S.fOffset, fMode: S.fMode, vOffset: S.vOffset, lane: !!S.lane, vision: vis.ok,
+      funscript: fsData ? { from: fsData.from, actions: fsData.acts.length, lows: fsData.lows.length, highs: fsData.highs.length, first: fsData.acts[0] && fsData.acts[0].at, last: fsData.acts[fsData.acts.length - 1].at } : null,
+      beats: st.beats, bpm: Math.round(currentBpm()), sounds, beatSfx: S.beatSfx, beatKind: S.beatKind, moans: S.moans,
+    };
+    const txt = JSON.stringify(rep, null, 1);
+    root.querySelector('.diagbox textarea').value = txt;
+    root.querySelector('.diagbox').classList.remove('hidden');
+    try { navigator.clipboard.writeText(txt).catch(() => {}); } catch (e) {}
+  }
   // Horloge précise de la vidéo : currentTime n'avance que par à-coups (une image à la fois).
   // requestVideoFrameCallback donne l'instant exact de chaque image : on extrapole entre deux.
   const vclock = { v: null, mt: 0, pt: 0, ok: false };
@@ -402,6 +491,7 @@
     }
   }
   const fsLoop = setInterval(fsTick, 25);
+  window.postMessage({ __gfAsk: 1 }, '*'); // funscripts déjà repérés avant le lancement de GoonFap
 
   // Funscripts repérés dans la page par fs-hook.js
   window.addEventListener('message', e => {
@@ -624,13 +714,28 @@
   }
 
   // ---------- Vidéo, plein écran ----------
+  // Cherche la vidéo principale, y compris cachée dans un composant (shadow DOM) ou une iframe du même site.
+  // Le résultat est gardé 1 s (la recherche complète coûte cher).
+  const mv = { v: null, at: 0 };
+  function allVideos(rootNode, out, depth = 0) {
+    if (depth > 6) return out;
+    rootNode.querySelectorAll('video').forEach(v => out.push(v));
+    rootNode.querySelectorAll('*').forEach(el => {
+      if (el.shadowRoot) allVideos(el.shadowRoot, out, depth + 1);
+      if (el.tagName === 'IFRAME') { try { const d = el.contentDocument; if (d) allVideos(d, out, depth + 1); } catch (e) {} }
+    });
+    return out;
+  }
   function mainVideo() {
+    const now = performance.now();
+    if (mv.v && mv.v.isConnected && now - mv.at < 1000) return mv.v;
     let best = null, area = 0;
-    for (const v of document.querySelectorAll('video')) {
+    for (const v of allVideos(document, [])) {
       const r = v.getBoundingClientRect(), a = r.width * r.height;
       if (a > area || (a === area && !v.paused)) { best = v; area = a; }
     }
-    return area > 0 ? best : null;
+    mv.v = area > 0 ? best : null; mv.at = now;
+    return mv.v;
   }
   // Zone réellement occupée par l'image dans l'élément <video> (bandes noires exclues)
   function videoBox(v) {
@@ -794,6 +899,9 @@
       case 'early': { const m = src(); if (m === 'funscript') S.fOffset = Math.min(400, S.fOffset + 10); else if (m === 'visual') S.vOffset = Math.min(400, S.vOffset + 10); else S.offset = Math.min(200, S.offset + 10); saveSettings(); break; }
       case 'late': { const m = src(); if (m === 'funscript') S.fOffset = Math.max(-200, S.fOffset - 10); else if (m === 'visual') S.vOffset = Math.max(-100, S.vOffset - 10); else S.offset = Math.max(0, S.offset - 10); saveSettings(); break; }
       case 'loadfs': fsInput.click(); break;
+      case 'tapcal': startTapCal(); break;
+      case 'diag': diagnostic(); break;
+      case 'diagclose': root.querySelector('.diagbox').classList.add('hidden'); break;
       case 'sndtest': send({ type: 'test-sounds' }); break;
       case 'play': { const v = mainVideo(); if (v) v.paused ? v.play().catch(() => {}) : v.pause(); break; }
       case 'immersive': toggleImmersive(); break;
@@ -853,10 +961,10 @@
     sendSettings();
   }
   function sendSettings() {
-    send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
+    send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, cumSnd: S.cumSnd, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
   }
   function onSettings() {
-    if (fsData) { const nb = S.fMode === 'both' ? fsData.all : fsData.lows; if (nb !== fsData.beats) { fsData.beats = nb; fsReset(); } }
+    if (fsData) { const nb = fsPick(); if (nb !== fsData.beats) { fsData.beats = nb; fsReset(); } }
     sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }
 
   chrome.runtime.onMessage.addListener(m => { if (m.type === 'gf-remove') remove(); });
