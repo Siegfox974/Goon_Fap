@@ -18,6 +18,13 @@ Elle affiche par-dessus le site les messages, les GIF et les boutons. Elle te pa
 
 Après avoir ajouté des GIF ou des sons, clique sur la flèche **Recharger** de GoonFap dans `chrome://extensions`.
 
+**Erreur « Cannot load extension with file or directory name desktop.ini » (ou un nom qui commence par `_`) :** Windows a glissé des fichiers cachés dans le dossier, ou un pack de sons contient des fichiers commençant par `_`.
+
+1. Double-clique sur **`Reparer-extension.bat`**, à la racine du projet. Il supprime ces fichiers et renomme les autres.
+2. Clique sur **Recharger** dans `chrome://extensions`.
+
+Pour éviter que ça revienne, place le projet ailleurs que sur le Bureau ou dans OneDrive, par exemple dans `C:\GoonFap`.
+
 ### Funscript : la synchro parfaite (faptap.net…)
 
 Beaucoup de vidéos FapHero ont un **funscript**, le fichier de mouvements des sex-toys connectés. Sur faptap.net, c'est la ligne en relief au-dessus de la barre de progression.
