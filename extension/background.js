@@ -21,8 +21,15 @@ async function ensureOffscreen() {
   });
 }
 
+// Styles du plein écran GoonFap (classes posées par content.js uniquement pendant le plein écran)
+const FS_CSS = `
+.gf-fs:fullscreen{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;background:#000!important;padding:0!important;margin:0!important;transform:none!important}
+.gf-fs .gf-fs-chain{width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;min-height:0!important;padding:0!important;margin:0!important;top:0!important;left:0!important;transform:none!important;aspect-ratio:auto!important}
+.gf-fs .gf-fs-video{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:contain!important;transform:none!important;margin:0!important}
+.gf-immersive-video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483646!important;background:#000!important;object-fit:contain!important;transform:none!important;margin:0!important}`;
+
 async function inject(tabId) {
-  await chrome.scripting.insertCSS({ target: { tabId }, css: '.gf-immersive-video{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;z-index:2147483646!important;background:#000!important;object-fit:contain!important;transform:none!important;margin:0!important}' });
+  await chrome.scripting.insertCSS({ target: { tabId }, css: FS_CSS });
   await chrome.scripting.executeScript({ target: { tabId }, files: ['common.js', 'content.js'] });
 }
 

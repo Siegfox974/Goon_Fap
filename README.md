@@ -22,7 +22,7 @@ Après avoir ajouté des GIF ou des sons, clique sur la flèche **Recharger** de
 
 1. Branche la manette et appuie sur un bouton.
 2. Ouvre la vidéo FapHero, clique sur l'icône GoonFap puis **▶ Lancer sur cet onglet**.
-3. Passe en plein écran avec **⛶** dans le panneau GoonFap. Ça garde les messages visibles, contrairement au plein écran du site.
+3. Passe en plein écran avec **⛶** dans le panneau GoonFap.
 4. Clique sur **🎯 Caler sur la barre rythmo**. La vidéo se met en pause et il y a 3 clics à faire :
    1. trace un rectangle autour de la barre rythmo ;
    2. clique sur un repère (un losange) pour que GoonFap retienne sa couleur ;
@@ -45,9 +45,22 @@ Le panneau permet aussi de :
 
 ### Messages et voix
 
-- **Ton :** *Salope 💦* (très cru, par défaut), *Explicite* ou *Coquin*. Les phrases s'accordent à ton anatomie (bite / chatte), à régler dans le popup.
+- **Ton :** *Salope 💦* (par défaut), *Explicite* ou *Coquin*. Les phrases s'accordent à ton anatomie (bite / chatte), à régler dans le popup.
+- **Personnage :** en *Salope*, c'est une maîtresse de gooning qui réagit à la vidéo :
+  - quand ça accélère : « Elle accélère… suis-la ! » ;
+  - quand ça ralentit, et aux pauses : STOP ;
+  - quand le rythme reprend ;
+  - quand tu restes longtemps à fond : edging ;
+  - pendant une longue séance : phrases de transe de gooning ;
+  - quand la fin de la vidéo approche : elle te prépare.
+- **Fin de la vidéo :** compte à rebours **10… 1…**, puis elle te fait jouir avec une vibration longue à fond et une rafale de GIF. Variantes au choix : *orgasme ruiné* (tout se coupe net), *déni* ou *rien*.
 - **Voix :** les messages sont lus à voix haute. Pour une voix **naturelle**, utilise **Microsoft Edge** et choisis une voix « Natural » / « Online » (⭐ dans la liste). Dans Chrome, la meilleure est « Google français ».
   La voix est jouée par l'extension, pas par l'onglet, donc elle ne perturbe pas la détection.
+
+### Plein écran
+
+Le bouton **⛶** du panneau met en plein écran le **lecteur du site**, et la vidéo remplit tout l'écran. Les messages, GIF et vibrations restent actifs.
+Si tu utilises le plein écran du site, GoonFap se glisse dedans aussi.
 
 ### Tes GIF : dossier `extension/gifs/`
 
@@ -56,21 +69,25 @@ GoonFap en affiche sur les côtés de l'écran pendant la séance, jamais sur la
 
 ### Tes sons : dossier `extension/sons/`
 
-Range tes `.wav` ou `.mp3` dans les sous-dossiers de `extension/sons/`. Le fichier `LISEZ-MOI.txt` du dossier donne le détail :
+**Dézippe ton pack de sons tel quel dans `extension/sons/`**, puis recharge l'extension. GoonFap range tout seul chaque fichier d'après son dossier et son nom :
 
-| Dossier | Quand |
+| Le fichier contient… | Utilisé pour |
 |---|---|
-| `lent/`, `moyen/`, `rapide/` | Gémissements enchaînés en continu, selon le tempo de la vidéo |
-| `stop/`, `reprise/` | Pause de la vidéo, reprise du rythme |
-| `bord/`, `jouis/` | Boutons Au bord / Je jouis |
-| `debut/`, `taquin/` | Lancement, moments taquins |
-| `beat/` | Un bruitage sur **chaque beat** (« plap »…), à activer dans le popup |
+| *Plaps*, *In & Out*, *Slap*, *Thrust* | Un claquement sur **chaque beat** (à activer dans le popup) |
+| *Oral*, *Mouth*, *Suck*, *Wet* | Bruitage « bouche » sur chaque beat (au choix dans le popup) |
+| *Cum*, *Climax*, *Orgasm* | L'orgasme (fin de vidéo, bouton Je jouis) |
+| *Moan*… *Low* / *Soft* | Gémissements doux, tempo lent |
+| *Moan* (sans précision) | Gémissements, tempo moyen |
+| *Moan*… *High* / *Intense* | Gros gémissements, tempo rapide |
+| *Materials*, *Body Noises* | Ignorés |
 
-Une bonne source est l'[OpenNSFW Sound Pack](https://opennsfw.carrd.co/), gratuit, à télécharger sur leur site :
+Tu peux aussi ranger toi-même un son dans un sous-dossier : `lent/`, `moyen/`, `rapide/`, `beat/`, `oral/`, `jouis/`, `stop/`, `reprise/`, `bord/`, `debut/` ou `taquin/`.
+Le popup affiche combien de sons ont été trouvés dans chaque catégorie.
 
-- gémissements *Low / Medium / High* → `lent/`, `moyen/`, `rapide/` ;
-- *Plaps* → `beat/` ;
-- *Cum* → `jouis/`.
+Une bonne source est l'[OpenNSFW Sound Pack](https://opennsfw.carrd.co/), gratuit :
+
+- le **SFX Pack** contient les claquements, la bouche et les orgasmes ;
+- les **gémissements** sont dans les packs de voix (*MoanPack*, *VoicePack*) du même site.
 
 Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/` et `sons/` sont ignorés par git.
 

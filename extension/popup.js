@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const FIELDS = ['source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
+const FIELDS = ['finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
   'voiceRate', 'voicePitch', 'clips', 'moans', 'clipVol', 'beatSfx', 'beatVol', 'gifs', 'gifEvery', 'gifDur', 'gifSize',
   'sens', 'band', 'minGap', 'predict', 'offset'];
 const NUM = new Set(['power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
@@ -62,36 +62,41 @@ $('#age-ok').addEventListener('click', async () => {
   $('#gate').classList.add('hidden'); $('#app').classList.remove('hidden');
 });
 
-// Compte les fichiers des dossiers sons/ et gifs/
-function countDir(name) {
+// Liste récursive d'un dossier de l'extension
+function listDir(name) {
   return new Promise(resolve => {
-    if (!chrome.runtime.getPackageDirectoryEntry) return resolve(null);
+    if (!chrome.runtime.getPackageDirectoryEntry) return resolve([]);
     chrome.runtime.getPackageDirectoryEntry(root => root.getDirectory(name, {}, dir => {
-      const out = {}; let pending = 0;
-      const walk = (d, top) => {
+      const out = []; let pending = 0;
+      const walk = d => {
         pending++;
         const rd = d.createReader(), all = [];
         const more = () => rd.readEntries(es => {
           if (es.length) { all.push(...es); return more(); }
           all.forEach(e => {
-            if (e.isDirectory) walk(e, top || e.name);
-            else if (!/\.(txt|md)$/i.test(e.name) && !e.name.startsWith('.')) out[top || '.'] = (out[top || '.'] || 0) + 1;
+            if (e.isDirectory) walk(e);
+            else if (!e.name.startsWith('.') && !/\.(txt|md)$/i.test(e.name)) out.push(e.fullPath.replace(/^\/(crxfs\/)?/, ''));
           });
           if (--pending === 0) resolve(out);
         }, () => { if (--pending === 0) resolve(out); });
         more();
       };
-      walk(dir, null);
-    }, () => resolve({})));
+      walk(dir);
+    }, () => resolve([])));
   });
 }
+const LABELS = { lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes',
+  debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
 async function counts() {
-  const g = await countDir('gifs');
-  const n = g ? Object.values(g).reduce((a, b) => a + b, 0) : 0;
-  $('#gif-count').textContent = n ? `${n} fichier(s) dans gifs/.` : 'Aucun GIF : dépose tes .gif / .webp / .mp4 dans le dossier gifs/ de l\'extension, puis recharge-la.';
-  const s = await countDir('sons');
-  const parts = s ? Object.entries(s).filter(([k]) => k !== '.').map(([k, v]) => `${k} : ${v}`) : [];
-  $('#snd-count').textContent = parts.length ? 'Sons trouvés — ' + parts.join(' · ') : 'Aucun son : range tes .wav/.mp3 dans les sous-dossiers de sons/ (voir LISEZ-MOI), puis recharge l\'extension.';
+  const g = await listDir('gifs');
+  $('#gif-count').textContent = g.length ? `${g.length} fichier(s) dans gifs/.` : 'Aucun GIF : dépose tes .gif / .webp / .mp4 dans le dossier gifs/ de l\'extension, puis recharge-la.';
+  const s = (await listDir('sons')).filter(f => /\.(wav|mp3|ogg|oga|m4a|aac|flac|webm|opus)$/i.test(f));
+  const by = {}; let ignored = 0;
+  s.forEach(f => { const k = GF.classifySound(f); if (k) by[k] = (by[k] || 0) + 1; else ignored++; });
+  const parts = Object.entries(by).map(([k, v]) => `${LABELS[k] || k} : ${v}`);
+  $('#snd-count').textContent = parts.length
+    ? `${s.length} sons trouvés — ` + parts.join(' · ') + (ignored ? ` · ${ignored} non utilisés (ambiances, matières…)` : '')
+    : 'Aucun son : dézippe ton pack dans le dossier sons/ de l\'extension, puis recharge-la.';
 }
 
 async function refresh() {

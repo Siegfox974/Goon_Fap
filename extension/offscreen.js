@@ -98,10 +98,16 @@ function stopAll() {
 
 // =====================================================================
 // Vision : suit les repères d'une barre rythmo à l'image
+//  1. profil horizontal : pour chaque colonne de la barre, part des pixels de la couleur des repères ;
+//  2. vitesse de défilement mesurée sur TOUTE la barre (corrélation entre deux images),
+//     séparément à gauche et à droite de la cible → robuste même quand les repères sont serrés ;
+//  3. pour chaque repère qui approche : temps d'arrivée sur la cible (eta), envoyé au content script.
 // =====================================================================
 const Vision = (() => {
   let lane = null, color = null, tol = 90, pendingPick = null, running = false;
-  let tracks = [], nextId = 1, lastProf = 0;
+  let prevProf = null, prevTs = 0, lastProf = 0, tw = 0;
+  const vel = { L: null, R: null };      // vitesse en px/ms (pixels du profil)
+  const conf = { L: 0, R: 0 };           // nb d'images d'affilée où la vitesse est stable
   const cv = new OffscreenCanvas(400, 24), c2 = cv.getContext('2d', { willReadFrequently: true });
   const pc = new OffscreenCanvas(5, 5), p2 = pc.getContext('2d', { willReadFrequently: true });
 
@@ -117,15 +123,16 @@ const Vision = (() => {
       try { res = await r.read(); } catch (e) { break; }
       if (res.done) break;
       const f = res.value;
-      try { frame(f); } catch (e) { /* on ignore une image ratée */ } finally { f.close(); }
+      try { frame(f); } catch (e) { /* image ratée : on ignore */ } finally { f.close(); }
     }
   }
 
   function stop() {
     running = false;
     if (reader) { reader.cancel().catch(() => {}); reader = null; }
-    tracks = [];
+    reset();
   }
+  function reset() { prevProf = null; vel.L = vel.R = null; conf.L = conf.R = 0; tw = 0; }
 
   // Rectangle en pixels CSS de la page → pixels de l'image capturée (gère un éventuel letterbox)
   function mapRect(fw, fh, r, vw, vh) {
@@ -134,21 +141,22 @@ const Vision = (() => {
   }
 
   function frame(f) {
-    const fw = f.displayWidth, fh = f.displayHeight, t = performance.now();
+    const fw = f.displayWidth, fh = f.displayHeight;
+    // horodatage de capture (µs) : intervalles précis même si le traitement a du retard
+    const ts = f.timestamp != null ? f.timestamp / 1000 : performance.now();
     if (pendingPick) {
       const p = pendingPick; pendingPick = null;
       const r = mapRect(fw, fh, { x: p.x - 2, y: p.y - 2, w: 5, h: 5 }, p.vw, p.vh);
       p2.drawImage(f, r.x, r.y, Math.max(1, r.w), Math.max(1, r.h), 0, 0, 5, 5);
       const d = p2.getImageData(0, 0, 5, 5).data;
-      // médiane par canal : robuste aux bords du repère
       const ch = k => { const a = []; for (let i = k; i < d.length; i += 4) a.push(d[i]); a.sort((x, y) => x - y); return a[a.length >> 1]; };
       broadcast({ type: 'picked', color: [ch(0), ch(1), ch(2)] });
     }
     if (!lane || !color) return;
 
     const r = mapRect(fw, fh, lane, lane.vw, lane.vh);
-    const W = Math.max(20, Math.min(400, Math.round(r.w))), H = Math.max(3, Math.min(24, Math.round(r.h)));
-    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const W = Math.max(40, Math.min(480, Math.round(r.w))), H = Math.max(3, Math.min(24, Math.round(r.h)));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; prevProf = null; }
     c2.drawImage(f, r.x, r.y, r.w, r.h, 0, 0, W, H);
     const d = c2.getImageData(0, 0, W, H).data;
     const prof = new Float32Array(W), tol2 = tol * tol, [cr, cg, cb] = color;
@@ -159,62 +167,94 @@ const Vision = (() => {
       }
     }
     for (let x = 0; x < W; x++) prof[x] /= H;
+    const T = lane.tx * W;
 
-    // Regroupe les colonnes en "repères"
-    const blobs = [];
+    // --- repères : groupes de colonnes, coupés en deux si deux repères se touchent ---
+    const runs = [];
     let s = -1;
     for (let x = 0; x <= W; x++) {
       const v = x < W ? prof[x] : 0;
       if (v >= 0.12 && s < 0) s = x;
-      else if (v < 0.12 && s >= 0) { blobs.push((s + x - 1) / 2 / W); s = -1; }
+      else if (v < 0.12 && s >= 0) { runs.push([s, x - 1]); s = -1; }
     }
-    track(blobs, t);
+    if (runs.length) {
+      const ws = runs.map(([a, b]) => b - a + 1).sort((a, b) => a - b);
+      const m = ws[Math.floor(ws.length * 0.3)];
+      tw = tw ? tw * 0.9 + m * 0.1 : m;
+    }
+    const blobs = [];
+    for (const [a, b] of runs) {
+      const w = b - a + 1, k = tw && w > tw * 1.7 ? Math.round(w / tw) : 1;
+      for (let j = 0; j < k; j++) blobs.push(a + (j + 0.5) * w / k - 0.5);
+    }
 
-    if (t - lastProf > 100) {
-      lastProf = t;
+    // --- vitesse de défilement de chaque côté de la cible ---
+    if (prevProf && ts > prevTs) {
+      const dt = ts - prevTs;
+      for (const side of ['L', 'R']) {
+        const lo = side === 'L' ? 0 : Math.ceil(T), hi = side === 'L' ? Math.floor(T) : W;
+        if (hi - lo < 8) continue;
+        const v = vel[side];
+        let sMin, sMax;
+        if (v != null) { // on cherche près de la vitesse connue (évite de confondre deux repères voisins)
+          const e = v * dt, win = Math.max(3, (tw || 6) * 1.2);
+          sMin = Math.floor(e - win); sMax = Math.ceil(e + win);
+        } else { sMax = Math.round(W * 0.12); sMin = -sMax; }
+        const est = bestShift(prevProf, prof, lo, hi, sMin, sMax);
+        if (est != null) {
+          const nv = est / dt;
+          // vitesse stable ? (sinon on attend avant de planifier : évite les doublons au démarrage)
+          const stable = v != null && Math.abs(nv - v) <= Math.max(0.03, Math.abs(v) * 0.2);
+          conf[side] = stable ? conf[side] + 1 : 0;
+          vel[side] = v == null ? nv : v * 0.5 + nv * 0.5;
+        }
+      }
+    }
+    prevProf = prof; prevTs = ts;
+
+    // --- temps d'arrivée de chaque repère qui approche de la cible ---
+    const etas = [];
+    for (const c of blobs) {
+      const side = c < T ? 'L' : 'R', v = vel[side];
+      if (v == null || Math.abs(v) < 0.005 || conf[side] < 3) continue; // barre immobile ou vitesse pas encore sûre
+      if ((side === 'L' && v <= 0) || (side === 'R' && v >= 0)) continue; // s'éloigne de la cible
+      const eta = (T - c) / v;
+      if (eta >= -40 && eta < 1500) etas.push(Math.round(eta));
+    }
+    if (etas.length) broadcast({ type: 'vetas', etas });
+
+    const now = performance.now();
+    if (now - lastProf > 100) {
+      lastProf = now;
       const N = 80, p = [];
       for (let k = 0; k < N; k++) p.push(Math.round(prof[Math.floor(k * W / N)] * 100) / 100);
       broadcast({ type: 'vprof', p, tx: lane.tx, n: blobs.length });
     }
   }
 
-  // Suit chaque repère d'une image à l'autre, mesure sa vitesse, annonce son arrivée sur la cible
-  function track(blobs, t) {
-    const T = lane.tx, used = new Set(), next = [];
-    for (const c of blobs) {
-      let best = null, bd = 0.08;
-      for (const tr of tracks) {
-        if (used.has(tr)) continue;
-        const dd = Math.abs(tr.c - c);
-        if (dd < bd) { bd = dd; best = tr; }
-      }
-      if (best) {
-        used.add(best);
-        const dt = t - best.t;
-        if (dt > 0) { const v = (c - best.c) / dt; best.v = best.n ? best.v * 0.6 + v * 0.4 : v; best.n++; }
-        const prevD = best.c - T, dNow = c - T;
-        best.c = c; best.t = t;
-        if (!best.hit && (prevD === 0 || Math.sign(prevD) !== Math.sign(dNow))) { best.hit = true; broadcast({ type: 'vhit', id: best.id }); }
-        next.push(best);
-      } else next.push({ id: nextId++, c, t, v: 0, n: 0, hit: false });
+  // Décalage (en px, sous-pixel) qui superpose le mieux le profil précédent sur l'actuel
+  function bestShift(a, b, lo, hi, sMin, sMax) {
+    let best = -Infinity, bs = null, energy = 0;
+    const scores = new Map();
+    for (let x = lo; x < hi; x++) energy += b[x] * b[x];
+    if (energy < 0.5) return null; // pas de repère de ce côté
+    for (let sh = sMin; sh <= sMax; sh++) {
+      let sc = 0, n = 0;
+      for (let x = Math.max(lo, sh); x < Math.min(hi, a.length + sh); x++) { sc += b[x] * a[x - sh]; n++; }
+      if (n < 8) continue;
+      sc /= n;
+      scores.set(sh, sc);
+      if (sc > best) { best = sc; bs = sh; }
     }
-    // Repère disparu juste sur la cible = il a été "frappé"
-    for (const tr of tracks) {
-      if (!used.has(tr) && !tr.hit && tr.n >= 2 && Math.abs(tr.c - T) < Math.max(0.03, Math.abs(tr.v) * 80)) broadcast({ type: 'vhit', id: tr.id });
-    }
-    tracks = next;
-    for (const tr of tracks) {
-      if (tr.hit || tr.n < 2) continue;
-      const d = tr.c - T;
-      if (d * tr.v >= 0 || Math.abs(tr.v) < 1e-6) continue; // s'éloigne ou immobile
-      const eta = -d / tr.v;
-      if (eta < 1200) broadcast({ type: 'veta', id: tr.id, eta });
-    }
+    if (bs == null || best <= 0) return null;
+    const l = scores.get(bs - 1), r = scores.get(bs + 1);
+    if (l != null && r != null) { const den = l - 2 * best + r; if (den < 0) return bs + 0.5 * (l - r) / den; }
+    return bs;
   }
 
   return {
     start, stop,
-    setLane(l, c, t) { lane = l; color = c; if (t) tol = t; tracks = []; },
+    setLane(l, c, t) { lane = l; color = c; if (t) tol = t; reset(); },
     pick(p) { pendingPick = p; },
   };
 })();
@@ -223,13 +263,16 @@ const Vision = (() => {
 // Sons : dossier sons/<moment>/ de l'extension
 // =====================================================================
 const Sounds = (() => {
-  const KINDS = ['debut', 'lent', 'moyen', 'rapide', 'taquin', 'stop', 'reprise', 'bord', 'jouis', 'beat'];
-  const MAP = { start: 'debut', warm: 'lent', medium: 'moyen', fast: 'rapide', tease: 'taquin', pause: 'stop', resume: 'reprise', edge: 'bord', cum: 'jouis' };
+  const KINDS = GF.KINDS;
+  const MAP = { start: 'debut', warm: 'lent', medium: 'moyen', fast: 'rapide', tease: 'taquin', pause: 'stop', resume: 'reprise', praise: 'reprise', edge: 'bord', final: 'bord', cum: 'jouis', ruin: 'stop', denial: 'stop' };
   const LOOP = new Set(['lent', 'moyen', 'rapide', 'taquin']);
   const AUDIO = /\.(wav|mp3|ogg|oga|m4a|aac|flac|webm|opus)$/i;
   const files = {}; KINDS.forEach(k => { files[k] = []; });
   const buffers = new Map();
-  let actx = null, opts = { clips: true, clipVol: 0.9, beatSfx: false, beatVol: 0.7, moans: true }, current = null, cur = null, gapTimer = null;
+  let actx = null, opts = { clips: true, clipVol: 0.9, beatSfx: false, beatVol: 0.7, moans: true, beatKind: 'beat' }, current = null, cur = null, gapTimer = null;
+  // Si un moment n'a pas de son, on prend le plus proche
+  const FALLBACK = { lent: ['moyen', 'rapide'], moyen: ['lent', 'rapide'], rapide: ['moyen', 'lent'], taquin: ['lent', 'oral', 'moyen'] };
+  const avail = k => (files[k] && files[k].length ? k : (FALLBACK[k] || []).find(f => files[f].length) || null);
 
   // Liste les fichiers du dossier sons/ (lecture du répertoire de l'extension)
   const ready = new Promise(resolve => {
@@ -237,20 +280,26 @@ const Sounds = (() => {
     chrome.runtime.getPackageDirectoryEntry(root => {
       root.getDirectory('sons', {}, dir => {
         let pending = 0;
-        const walk = (d, kind) => {
+        // Tout est parcouru, et chaque fichier est rangé d'après son dossier ou son nom
+        // (on peut donc déposer un pack entier tel quel).
+        const walk = d => {
           pending++;
           const rd = d.createReader(), all = [];
           const more = () => rd.readEntries(es => {
             if (es.length) { all.push(...es); more(); return; }
             for (const e of all) {
-              if (e.isDirectory) { const k = kind || (KINDS.includes(e.name.toLowerCase()) ? e.name.toLowerCase() : null); if (k) walk(e, k); }
-              else if (kind && AUDIO.test(e.name)) files[kind].push(e.fullPath.replace(/^\/(crxfs\/)?/, ''));
+              if (e.isDirectory) walk(e);
+              else if (AUDIO.test(e.name)) {
+                const path = e.fullPath.replace(/^\/(crxfs\/)?/, '');
+                const k = GF.classifySound(path);
+                if (k) files[k].push(path);
+              }
             }
             if (--pending === 0) resolve();
           }, () => { if (--pending === 0) resolve(); });
           more();
         };
-        walk(dir, null);
+        walk(dir);
       }, () => resolve());
     });
   });
@@ -268,10 +317,15 @@ const Sounds = (() => {
   }
   const pick = list => list[Math.floor(Math.random() * list.length)];
 
-  async function play(kind, vol, onEnd) {
+  async function play(kind, vol, onEnd, maxDur) {
     if (!actx || !files[kind] || !files[kind].length) return null;
     try {
-      const b = await buffer(pick(files[kind]));
+      const path = pick(files[kind]);
+      const b = await buffer(path);
+      if (maxDur && b.duration > maxDur) { // trop long pour un bruitage de beat : on l'écarte
+        files[kind] = files[kind].filter(p => p !== path);
+        return files[kind].length ? play(kind, vol, onEnd, maxDur) : null;
+      }
       const s = actx.createBufferSource(), g = actx.createGain();
       g.gain.value = vol;
       s.buffer = b; s.connect(g).connect(actx.destination);
@@ -285,7 +339,8 @@ const Sounds = (() => {
   function loopMood() {
     clearTimeout(gapTimer);
     if (!opts.clips || !opts.moans || !current || !actx) return;
-    const kind = current;
+    const kind = avail(current);
+    if (!kind) return;
     play(kind, opts.clipVol, () => {
       if (cur && cur.kind === kind) gapTimer = setTimeout(loopMood, 300 + Math.random() * 2500);
     }).then(s => { cur = s ? { s, kind } : null; if (!s) gapTimer = setTimeout(loopMood, 4000); });
@@ -300,7 +355,7 @@ const Sounds = (() => {
     configure(s) {
       Object.assign(opts, {
         clips: s.clips !== false, clipVol: s.clipVol ?? opts.clipVol, beatSfx: !!s.beatSfx, beatVol: s.beatVol ?? opts.beatVol,
-        moans: s.moans !== false,
+        moans: s.moans !== false, beatKind: s.beatKind || opts.beatKind,
       });
       if (!opts.clips || !opts.moans) stopCurrent();
     },
@@ -310,7 +365,8 @@ const Sounds = (() => {
       if (k === current) return;
       current = LOOP.has(k) ? k : null;   // seuls lent/moyen/rapide/taquin tournent en boucle
       if (!current) { stopCurrent(); return; }
-      if (!opts.clips || !files[k].length) return;
+      if (!opts.clips || !avail(k)) return;
+      if (cur && cur.kind === avail(k)) return; // même famille de sons : on laisse finir
       stopCurrent();
       loopMood();
     },
@@ -321,7 +377,12 @@ const Sounds = (() => {
       stopCurrent();
       play(k, opts.clipVol, () => { if (current) gapTimer = setTimeout(loopMood, 800); }).then(s => { cur = s ? { s, kind: k } : null; });
     },
-    beat() { if (opts.beatSfx) play('beat', opts.beatVol); },
+    beat() {
+      if (!opts.beatSfx) return;
+      let k = opts.beatKind === 'mix' ? (Math.random() < 0.5 ? 'beat' : 'oral') : opts.beatKind;
+      if (!files[k] || !files[k].length) k = files.beat.length ? 'beat' : 'oral';
+      play(k, opts.beatVol, null, 1.2);
+    },
     has(kind) { const k = MAP[kind] || kind; return !!(files[k] && files[k].length); },
   };
 })();

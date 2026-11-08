@@ -54,6 +54,14 @@
       <label>Quantité
         <select id="talk"><option value="0">Aucun</option><option value="1">Peu</option><option value="2">Normal</option><option value="3">Beaucoup</option></select>
       </label>
+      <label>Fin de la vidéo
+        <select id="finale">
+          <option value="cum">Compte à rebours… et elle te fait jouir 💦</option>
+          <option value="ruin">Orgasme ruiné 😈</option>
+          <option value="denial">Déni : pas le droit de jouir 🔒</option>
+          <option value="off">Rien de spécial</option>
+        </select>
+      </label>
       <label class="check"><input type="checkbox" id="voice"> Lire les messages à voix haute</label>
       <label>Voix
         <select id="voiceName"><option value="">Automatique (la plus naturelle)</option></select>
@@ -66,11 +74,15 @@
 
     <details>
       <summary>🎧 Sons (dossier sons/)</summary>
+      <p class="small">Dézippe ton pack de sons (ex. OpenNSFW) <b>tel quel</b> dans <code>extension/sons/</code> : GoonFap range tout seul les fichiers d'après leurs noms.</p>
       <p id="snd-count" class="small"></p>
       <label class="check"><input type="checkbox" id="clips"> Jouer les sons du dossier</label>
       <label class="check"><input type="checkbox" id="moans"> Gémissements en continu selon le tempo</label>
       <label>Volume <output data-for="clipVol"></output><input type="range" id="clipVol" min="0" max="1" step="0.05"></label>
-      <label class="check"><input type="checkbox" id="beatSfx"> Un bruitage sur chaque beat (sons/beat)</label>
+      <label class="check"><input type="checkbox" id="beatSfx"> Un bruitage sur chaque beat</label>
+      <label>Bruitage
+        <select id="beatKind"><option value="beat">Claquements (plaps)</option><option value="oral">Bouche (slurps)</option><option value="mix">Les deux</option></select>
+      </label>
       <label>Volume des bruitages <output data-for="beatVol"></output><input type="range" id="beatVol" min="0" max="1" step="0.05"></label>
     </details>
 

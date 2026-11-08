@@ -18,8 +18,10 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     talk: 2,           // 0 aucun … 3 beaucoup
     voice: true,       // lire les messages à voix haute
     voiceName: '',     // '' = meilleure voix française trouvée
-    voiceRate: 0.95,
-    voicePitch: 1.1,
+    voiceRate: 0.92,
+    voicePitch: 1.05,
+    finale: 'cum',     // fin de vidéo : 'cum' | 'ruin' | 'denial' | 'off'
+    beatKind: 'beat',  // bruitage sur chaque beat : 'beat' (claquements) | 'oral' | 'mix'
     clips: true,       // jouer les sons du dossier sons/ quand il y en a
     moans: true,       // ambiance : gémissements en continu selon le tempo
     clipVol: 0.9,
@@ -71,24 +73,47 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     start: ['Prends-toi en main… on commence 😈'],
   };
 
-  // Niveau « Salope » : elle te parle, crûment. Listes par anatomie + listes communes.
+  // Niveau « Salope » : une maîtresse de gooning, vicieuse, qui ne te lâche jamais et te parle crûment.
+  // Elle réagit à la vidéo (accélérations, ralentissements, pauses, fin qui approche).
+  // Listes communes (any) + listes selon l'anatomie (cock / pussy). Les « ·e » sont accordés par fit().
   const HARD = {
     any: {
-      warm: ['Mmh… touche-toi lentement pour moi, mon cochon.', 'Doucement… je veux te voir te tortiller de plaisir.',
-        'Laisse-moi te regarder te toucher… t\'es tellement bandant·e.', 'Lentement… j\'adore te faire languir.'],
-      medium: ['Oh oui… continue comme ça, ça m\'excite tellement.', 'T\'entends comme je mouille rien qu\'à te regarder ?',
-        'Gémis pour moi. Plus fort. Je veux t\'entendre.', 'Suis le rythme, mon petit vicieux. Rien que le rythme.'],
-      fast: ['Plus vite ! Plus vite, putain ! 💦', 'Vas-y, défonce-toi, je veux te voir craquer !', 'Ne t\'arrête pas, salope, plus fort !',
-        'Oui, oui, OUI ! Comme ça ! Encore !'],
+      start: ['Mmh… te voilà, mon petit gooner. Installe-toi… je vais te vider la tête.',
+        'Coucou mon cochon… t\'es venu te faire sucer le cerveau ? Allez, mets-toi à l\'aise.',
+        'Éteins tout le reste. Il n\'y a plus que moi, la vidéo et ta main.',
+        'Ce soir tu ne réfléchis plus. Tu suis le rythme et tu m\'obéis. C\'est tout.'],
+      warm: ['Mmh… doucement… savoure chaque caresse pour moi.', 'Lentement… je veux te voir fondre, centimètre par centimètre.',
+        'T\'es tout chaud déjà, hein ? Moi aussi je mouille en te regardant…', 'Laisse ta tête se vider… il n\'y a plus que le rythme.',
+        'Respire… et touche-toi comme si c\'était ma langue.', 'Doucement… on a tout le temps. Je vais te faire goon pendant des heures.'],
+      medium: ['Oh oui… continue comme ça, t\'es tellement bon·ne quand tu obéis.', 'Gémis pour moi. Plus fort. Je veux t\'entendre.',
+        'Suis le rythme, mon petit vicieux… rien que le rythme.', 'C\'est bon, hein ? Ta main, mes mots… t\'es à moi.',
+        'Regarde-la… et imagine que c\'est moi qui te fais ça.', 'T\'entends ce bruit ? C\'est le son d\'un gooner qui perd la tête.'],
+      fast: ['Plus vite ! Plus vite, putain ! 💦', 'Vas-y, défonce-toi, je veux te voir craquer !', 'Ne t\'arrête pas, salope ! Plus fort !',
+        'Oui, oui, OUI ! Comme ça ! Encore !', 'Tiens le rythme ! Je veux tes gémissements !', 'T\'es un animal maintenant. Pompe !'],
+      faster: ['Elle accélère… suis-la ! Ne décroche pas !', 'Oh oui, ça s\'emballe… plus vite pour moi !', 'Ça monte ! Accélère, mon cochon, accélère !',
+        'T\'as vu ? Elle s\'excite. Toi aussi. Plus vite !'],
+      slower: ['Ralentis… doucement… savoure.', 'On redescend… tout doucement… ne lâche pas le rythme.', 'Lentement maintenant… je veux que ça dure encore.'],
+      goon: ['Pompe… pompe… pompe pour moi. Ne pense à rien.', 'Ton cerveau fond, hein ? Laisse-le fondre. T\'es fait pour ça.',
+        'T\'es un bon gooner. Un bon gooner ne s\'arrête jamais.', 'Plus rien n\'existe. Juste ta main, le rythme et moi.',
+        'Encore un peu… et encore… t\'es accro, avoue.', 'Regarde-toi… complètement vidé·e de toute pensée. J\'adore.',
+        'Tu vas goon pour moi jusqu\'à en trembler.'],
       tease: ['Juste le bout… effleure… je veux que tu me supplies.', 'Frotte la manette doucement… sans te soulager.',
-        'Tout doux… je te veux frustré·e et trempé·e.'],
+        'Tout doux… je te veux frustré·e et dégoulinant·e.'],
       pause: ['STOP. Lâche tout. Mains en l\'air, petit·e cochon·ne.', 'Interdiction de te toucher. Regarde-toi palpiter… j\'adore ça.',
-        'Stop ! T\'as pas le droit. Tu vas attendre que je te le dise.', 'Lâche-toi. Respire. Et pense à ce que je vais te faire.'],
-      resume: ['Reprends-toi en main… et vite.', 'Allez, ça repart. Montre-moi à quel point t\'en as envie.', 'Tu as été sage. Touche-toi, maintenant.'],
+        'Stop ! T\'as pas le droit. Tu attends que je te le dise.', 'Lâche-toi. Respire. Et pense à ce que je vais te faire après.',
+        'Mains en l\'air. Tu sens comme t\'en crèves d\'envie ? C\'est exactement là que je te veux.'],
+      resume: ['Reprends-toi en main… et vite.', 'Allez, ça repart ! Montre-moi à quel point t\'en as envie.', 'Tu as été sage. Touche-toi, maintenant.',
+        'Vas-y… reprends là où je t\'ai laissé·e.'],
+      praise: ['T\'as tenu ? Bon gooner. Je suis fière de toi.', 'T\'es resté·e au bord sans craquer… t\'es parfait·e.',
+        'Mmh, t\'as obéi… tu mérites que je te fasse encore plus mal au bord.'],
       edge: ['T\'es au bord, hein ? Interdit de jouir. Retiens-toi.', 'Je sens que tu vas craquer… pas encore, mon cochon !',
-        'Tiens bon… t\'es à moi, tu jouis quand JE le décide.'],
+        'Tiens bon… t\'es à moi, tu jouis quand JE le décide.', 'Au bord… reste là… souffre un peu pour moi.'],
+      final: ['La fin approche… je veux que tu sois au bord pour moi.', 'Plus que quelques instants… prépare-toi à tout lâcher.',
+        'Tiens bon, mon gooner… bientôt je te donne la permission.', 'Ça arrive… sens-le monter… ne jouis pas avant mon signal.'],
       cum: ['JOUIS ! Maintenant ! Lâche tout pour moi ! 💦', 'Vas-y, explose ! Je veux tout voir ! 💦', 'Jouis, salope ! Jouis fort ! 💦'],
-      start: ['Coucou mon cochon… prêt·e à te faire vider ? 😈', 'Mets-toi à l\'aise… je vais m\'occuper de toi.'],
+      ruin: ['STOP ! Lâche tout ! Mains en l\'air ! Regarde-le se gâcher… 😈', 'Ruiné ! Ne touche plus ! T\'aurais cru que j\'allais te laisser jouir ? 😈'],
+      denial: ['Non. Pas ce soir. Range ça et va dormir frustré·e. 😈', 'Pas de permission aujourd\'hui. Tu reviendras me supplier demain. 🔒'],
+      after: ['Mmh… c\'était bon, hein ? Reviens me voir quand tu veux, mon gooner.', 'T\'as été parfait·e. Respire… je suis là.'],
     },
     cock: {
       warm: ['Sors ta queue… et branle-la tout doucement pour moi.', 'Mmh, elle est déjà toute dure ? Caresse-la lentement.',
@@ -100,11 +125,14 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
       fast: ['Branle-toi plus vite ! Plus fort ! 💦', 'Défonce ta queue, je veux la voir prête à exploser !',
         'Plus vite ! Imagine que tu me baises comme une chienne !', 'Tape ta queue, plus fort, ne ralentis pas !',
         'Je veux voir tes couilles se serrer… encore !', 'Branle-toi comme un salaud, maintenant !'],
+      faster: ['Elle accélère ! Branle ta queue plus vite !', 'Plus vite sur ta bite ! Suis-la, mon cochon !'],
+      goon: ['Pompe ta queue… pompe… t\'es né pour ça.', 'Ta bite dirige, ton cerveau ne sert plus à rien.', 'Une queue dure, une tête vide. Parfait.'],
       tease: ['Juste le gland… effleure-le à peine.', 'Fais glisser la manette sous tes couilles… tout doucement.'],
       pause: ['Lâche ta bite ! Tout de suite !', 'Mains en l\'air. Regarde ta queue toute dure qui tressaute… j\'adore.',
         'Ne touche plus ta queue. Laisse-la palpiter toute seule.'],
       edge: ['Ta queue va exploser ? Interdit ! Serre la base et retiens-toi !', 'Je vois ta bite qui coule… pas encore, mon cochon !',
         'Tes couilles sont pleines… garde tout pour moi.'],
+      final: ['Tes couilles sont pleines… bientôt je te laisse tout vider.', 'Garde ta queue au bord… le final arrive.'],
       cum: ['Gicle ! Vide tes couilles pour moi ! 💦', 'Jouis ! Mets-en partout ! 💦', 'Vas-y, crache tout, je veux voir ton foutre ! 💦'],
     },
     pussy: {
@@ -114,22 +142,40 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
         'Appuie la manette contre ton clito… sens comme ça vibre.'],
       fast: ['Plus vite ! Défonce ta chatte ! 💦', 'Frotte ton clito comme une folle, maintenant !', 'Deux doigts, plus fort, plus vite !',
         'Je veux t\'entendre crier, ne ralentis pas !'],
+      faster: ['Elle accélère ! Frotte ton clito plus vite !'],
+      goon: ['Ta chatte dégouline, ta tête est vide. Parfait.'],
       tease: ['Juste effleurer ton clito… à peine.', 'Fais glisser la manette sur tes lèvres… sans appuyer.'],
       pause: ['Retire tes doigts ! Tout de suite !', 'Mains en l\'air. Sens ta chatte qui palpite toute seule…'],
       edge: ['Tu vas jouir ? Interdit ! Retire tes doigts !', 'Ta chatte se contracte… pas encore, ma salope !'],
+      final: ['Ta chatte tremble… bientôt je te laisse exploser.'],
       cum: ['Jouis ! Laisse ta chatte exploser ! 💦', 'Gicle pour moi, ma salope ! 💦', 'Jouis fort, je veux te voir trembler ! 💦'],
     },
   };
 
-  /** Tire un message. kind = warm|medium|fast|tease|pause|resume|edge|cum|start */
+  // Évite de répéter les dernières phrases
+  const recent = [];
+  function draw(pool) {
+    if (!pool.length) return '';
+    const fresh = pool.filter(p => !recent.includes(p));
+    const src = fresh.length ? fresh : pool;
+    const t = src[Math.floor(Math.random() * src.length)];
+    recent.push(t); if (recent.length > 24) recent.shift();
+    return t;
+  }
+
+  /** Tire un message. kind = start|warm|medium|fast|faster|slower|goon|tease|pause|resume|praise|edge|final|cum|ruin|denial|after */
   function say(kind, level, anatomy = 'any') {
     let pool;
     if (level === 'hard') {
-      pool = (HARD.any[kind] || []).concat(anatomy !== 'any' && HARD[anatomy] ? (HARD[anatomy][kind] || []) : []);
-      // l'anatomie compte double pour coller au mieux
-      if (anatomy !== 'any' && HARD[anatomy] && HARD[anatomy][kind]) pool = pool.concat(HARD[anatomy][kind]);
-    } else pool = (level === 'hot' ? HOT : SOFT)[kind] || SOFT[kind] || [];
-    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : '';
+      const a = HARD.any[kind] || [], b = anatomy !== 'any' && HARD[anatomy] ? (HARD[anatomy][kind] || []) : [];
+      pool = a.concat(b, b); // l'anatomie compte double pour coller au mieux
+      if (!pool.length) pool = HARD.any.medium;
+    } else {
+      const fb = { faster: 'fast', slower: 'warm', goon: 'medium', praise: 'resume', final: 'edge', ruin: 'pause', denial: 'pause', after: 'resume' };
+      const L = level === 'hot' ? HOT : SOFT;
+      pool = L[kind] || L[fb[kind]] || SOFT[kind] || SOFT[fb[kind]] || [];
+    }
+    return draw(pool);
   }
   /** Accorde les « ·e » selon l'anatomie : cock → masculin, pussy → féminin. */
   function fit(text, anatomy) {
@@ -137,7 +183,31 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     if (anatomy === 'pussy') return text.replace(/·ne\b/g, 'ne').replace(/·e\b/g, 'e');
     return text;
   }
+  /**
+   * Range automatiquement un son d'après son chemin (dossier + nom) — permet de déposer
+   * un pack entier (ex. OpenNSFW) tel quel dans sons/.
+   * Renvoie : debut|lent|moyen|rapide|taquin|stop|reprise|bord|jouis|beat|oral|null
+   */
+  const KINDS = ['debut', 'lent', 'moyen', 'rapide', 'taquin', 'stop', 'reprise', 'bord', 'jouis', 'beat', 'oral'];
+  function classifySound(path) {
+    const parts = path.toLowerCase().split('/');
+    // 1) rangé à la main dans un de nos dossiers ?
+    for (const p of parts.slice(0, -1)) if (KINDS.includes(p)) return p;
+    const s = parts.join('/');
+    // 2) sinon, d'après les mots du chemin
+    if (/material|ambien|music|musique|room|bed ?creak|furniture/.test(s)) return null;
+    if (/cum|climax|orgasm|ejac|squirt|creampie|jouis/.test(s)) return 'jouis';
+    if (/plap|clap|slap|spank|thrust|pound|in ?(&|and|-|_)? ?out|squelch|fap|stroke/.test(s)) return 'beat';
+    if (/moan|gemi|gémi|breath|pant|whimper|groan|voice|vocal|va\b/.test(s)) {
+      if (/\bhigh|intense|loud|hard|heavy|scream|fort/.test(s)) return 'rapide';
+      if (/\blow|soft|light|gentle|quiet|whisper|doux/.test(s)) return 'lent';
+      return 'moyen';
+    }
+    if (/oral|mouth|suck|slurp|blow|gag|lick|kiss|wet|spit|drool/.test(s)) return 'oral';
+    return null;
+  }
+
   const kindForBpm = bpm => (bpm < 90 ? 'warm' : bpm < 150 ? 'medium' : 'fast');
 
-  return { DEFAULTS, SOFT, HOT, HARD, say, fit, kindForBpm };
+  return { DEFAULTS, SOFT, HOT, HARD, KINDS, say, fit, classifySound, kindForBpm };
 })());

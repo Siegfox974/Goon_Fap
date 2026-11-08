@@ -145,7 +145,7 @@
   // kind : warm|medium|fast|tease|pause|resume|edge|cum|start
   function talk(kind, ms, extra = {}) {
     message(GF.say(kind, S.level, S.anatomy) + (extra.small ? `<small>${extra.small}</small>` : ''), ms, extra);
-    if (['start', 'pause', 'resume', 'edge', 'cum'].includes(kind)) send({ type: 'clip', kind });
+    if (['start', 'pause', 'resume', 'praise', 'edge', 'final', 'cum', 'ruin', 'denial'].includes(kind)) send({ type: 'clip', kind });
   }
 
   let gifCount = 0, lastGif = 0;
@@ -180,17 +180,23 @@
   function vibrate(s, now) {
     if (now < st.muteUntil) return false;
     // anti-doublon : jamais deux vibrations trop rapprochées
-    const minGap = Math.max(60, st.iv.length >= 2 ? median(st.iv) * 0.35 : 60);
+    const recent = st.iv.slice(-3);
+    const minGap = Math.max(35, recent.length >= 2 ? Math.min(...recent) * 0.3 : 35);
     if (now - st.lastFire < minGap) return false;
+    const gap = Math.min(now - st.lastFire, recent.length ? median(recent) : 1000);
     st.lastFire = now;
     const bpm = currentBpm();
     let mag = S.power * (S.nuance ? s : 1);
     if (S.tempoBoost && bpm) mag *= 0.55 + 0.45 * Math.min(1, Math.max(0, (bpm - 60) / 140));
-    const gap = st.locked ? st.period : (st.iv.length ? median(st.iv) : 1000);
-    rumble(Math.max(40, Math.min(S.pulse, gap * 0.7)), mag, mag);
+    // Tempo rapide : pulsations courtes, et surtout le petit moteur (plus nerveux) pour que chaque beat reste net.
+    // Le gros moteur met trop de temps à s'arrêter : sur un tempo rapide il ferait un bourdonnement continu.
+    const ms = Math.max(25, Math.min(S.pulse, gap * 0.5));
+    const heavy = Math.min(1, Math.max(0, (gap - 140) / 220));
+    rumble(ms, mag * heavy, mag);
     st.flash = 1;
     st.hits.push(now);
     host.dataset.fires = (+(host.dataset.fires || 0) + 1);
+    try { if (localStorage.getItem('gfDebug')) host.dataset.ft = (host.dataset.ft ? host.dataset.ft + ',' : '') + Math.round(now); } catch (e) {}
     send({ type: 'beat' });
     return true;
   }
@@ -240,25 +246,35 @@
   }
 
   // ----- Source "barre rythmo" : repères qui arrivent sur la cible -----
-  const vis = { timers: new Map(), fired: new Set(), ok: null, prof: null };
-  function onVEta(id, eta) {
+  // Le moteur envoie, à chaque image, le temps d'arrivée (eta) de chaque repère qui approche.
+  // On regroupe ces estimations par instant d'arrivée : un beat planifié = un repère.
+  const vis = { pend: [], fired: [], ok: null, prof: null };
+  function onVEtas(etas) {
     if (S.source !== 'visual' || calib) return;
-    if (vis.fired.has(id)) return;
-    clearTimeout(vis.timers.get(id));
-    const wait = eta - S.vOffset;
-    if (wait <= 6) { fireVisual(id); return; }
-    vis.timers.set(id, setTimeout(() => fireVisual(id), wait));
-    if (vis.timers.size > 40) { const k = vis.timers.keys().next().value; clearTimeout(vis.timers.get(k)); vis.timers.delete(k); }
-  }
-  function onVHit(id) { if (S.source === 'visual' && !calib && !vis.fired.has(id)) fireVisual(id); }
-  function fireVisual(id) {
-    if (vis.fired.has(id)) return;
-    vis.fired.add(id);
-    if (vis.fired.size > 60) vis.fired.delete(vis.fired.values().next().value);
-    clearTimeout(vis.timers.get(id)); vis.timers.delete(id);
     const now = performance.now();
+    const recent = st.iv.slice(-3);
+    const tol = Math.max(18, Math.min(80, (recent.length ? Math.min(...recent) : 300) * 0.35));
+    vis.fired = vis.fired.filter(t => now - t < 1000);
+    for (const eta of etas) {
+      const at = now + eta - S.vOffset;
+      if (vis.fired.some(t => Math.abs(t - at) < tol)) continue;      // déjà vibré pour ce repère
+      let p = vis.pend.find(q => Math.abs(q.at - at) < tol);
+      if (p) p.at = p.at * 0.3 + at * 0.7; else { p = { at }; vis.pend.push(p); }
+      clearTimeout(p.timer);
+      const wait = p.at - now;
+      if (wait <= 4) firePend(p); else p.timer = setTimeout(() => firePend(p), wait);
+    }
+  }
+  function firePend(p) {
+    clearTimeout(p.timer);
+    const i = vis.pend.indexOf(p);
+    if (i < 0) return;
+    vis.pend.splice(i, 1);
+    const now = performance.now();
+    vis.fired.push(p.at);
     if (vibrate(1, now)) registerBeat(now, now);
   }
+  function clearPend() { vis.pend.forEach(p => clearTimeout(p.timer)); vis.pend = []; }
 
   // Battements de cœur pendant les pauses
   function startTease() {
@@ -278,20 +294,32 @@
     const silent = now - st.last;
     if (!st.inPause && st.beats >= 4 && silent > silenceLimit()) {
       st.inPause = true; st.locked = false; st.iv = [];
-      talk('pause', 3500);
+      // Pause DANS la vidéo (beats arrêtés alors qu'elle tourne) → STOP. Si c'est toi qui as mis pause, ou si c'est la fin : rien.
+      const vp = mainVideo();
+      const userStopped = (vp && (vp.paused || vp.ended)) || dir.done;
+      if (!userStopped) { talk('pause', 3500); startTease(); }
       setMood('pause');
-      startTease();
       st.nextTalk = now + 9000;
     }
     const bpm = currentBpm();
     if (bpm >= 150) { if (!st.fastSince) st.fastSince = now; } else st.fastSince = 0;
+    const active = !st.inPause && st.beats > 0 && silent < silenceLimit();
+    if (active) { if (!st.activeSince) st.activeSince = now; } else st.activeSince = 0;
 
-    if (S.talk > 0 && now >= st.nextTalk && now >= st.muteUntil && !calib) {
+    director(now, bpm, active);
+
+    if (S.talk > 0 && now >= st.nextTalk && now >= st.muteUntil && !calib && !dir.countdown) {
       let kind = null;
       if (st.inPause) kind = 'pause';
-      else if (silent < silenceLimit() && bpm) kind = st.fastSince && now - st.fastSince > 25000 && Math.random() < 0.5 ? 'edge' : GF.kindForBpm(bpm);
+      else if (active && bpm) {
+        const r = Math.random();
+        if (dir.finalSaid && r < 0.5) kind = 'final';                                     // la fin de la vidéo approche
+        else if (st.fastSince && now - st.fastSince > 25000 && r < 0.4) kind = 'edge';    // longtemps à fond
+        else if (st.activeSince && now - st.activeSince > 40000 && r < 0.35) kind = 'goon'; // longue séance : transe
+        else kind = GF.kindForBpm(bpm);
+      }
       if (kind) talk(kind);
-      st.nextTalk = now + ([0, 22, 12, 6][S.talk] || 12) * 1000 * (0.7 + Math.random() * 0.6);
+      st.nextTalk = now + talkGap();
     }
     if (S.gifs && gifCount && now >= st.nextGif && !calib) {
       if (st.beats) showGif();
@@ -300,6 +328,56 @@
     updateLane();
     updatePanel(bpm, silent);
   }, 200);
+
+  // ---------- Le « cerveau » de la voix : réagit à ce que fait la vidéo ----------
+  const dir = { hist: [], lastHist: 0, lastTempoTalk: 0, finalSaid: false, countdown: false, lastN: 0, done: false };
+  const talkGap = () => ([0, 22, 12, 6][S.talk] || 12) * 1000 * (0.7 + Math.random() * 0.6);
+  function director(now, bpm, active) {
+    if (calib) return;
+    // 1. Accélérations / ralentissements de la vidéo
+    if (now - dir.lastHist > 1000) {
+      dir.lastHist = now;
+      dir.hist.push(active ? bpm : 0);
+      if (dir.hist.length > 6) dir.hist.shift();
+      const old = dir.hist[0];
+      if (S.talk > 0 && active && old && bpm && now - dir.lastTempoTalk > 9000 && now >= st.muteUntil && !dir.countdown) {
+        const ratio = bpm / old;
+        if (ratio > 1.18) { talk('faster', 2800); dir.lastTempoTalk = now; st.nextTalk = now + talkGap(); }
+        else if (ratio < 0.8) { talk('slower', 2800); dir.lastTempoTalk = now; st.nextTalk = now + talkGap(); }
+      }
+    }
+    // 2. Fin de la vidéo : annonce, compte à rebours, puis orgasme (ou ruiné / déni)
+    const v = mainVideo();
+    if (!v || !isFinite(v.duration) || v.duration < 60 || S.finale === 'off') return;
+    const rem = v.duration - v.currentTime;
+    if (rem > 100) { dir.finalSaid = dir.countdown = dir.done = false; dir.lastN = 0; return; } // retour en arrière / vidéo suivante
+    if (v.paused || dir.done) return;
+    if (rem <= 75 && !dir.finalSaid) { dir.finalSaid = true; talk('final', 4000); st.nextTalk = now + talkGap(); }
+    if (rem <= 10.5 && !dir.countdown) { dir.countdown = true; dir.lastN = 11; }
+    if (dir.countdown) {
+      const n = Math.ceil(rem - 0.3);
+      if (n >= 1 && n < dir.lastN) {
+        dir.lastN = n;
+        message(`<span style="font-size:1.8em">${n}</span>`, 950, { gif: false });
+      }
+      if (rem <= 0.6 || v.ended) { dir.done = true; dir.countdown = false; finale(); }
+    }
+  }
+  function finale() {
+    const kind = S.finale === 'ruin' ? 'ruin' : S.finale === 'denial' ? 'denial' : 'cum';
+    if (kind === 'cum') {
+      talk('cum', 7000, { gif: true });
+      showGif(3);
+      rumble(5000, S.power, S.power);
+      st.muteUntil = performance.now() + 5000;
+    } else {
+      // ruiné / déni : on coupe tout, net
+      clearPend(); clearTimeout(st.timer); stopRumble();
+      st.muteUntil = performance.now() + 20000;
+      talk(kind, 7000);
+    }
+    setTimeout(() => { if (alive) talk('after', 5000); }, 9000);
+  }
 
   // ---------- Panneau ----------
   let level = 0, sounds = null;
@@ -398,25 +476,48 @@
     const s = Math.min(r.width / vw, r.height / vh), w = vw * s, h = vh * s;
     return { x: r.left + (r.width - w) / 2, y: r.top + (r.height - h) / 2, w, h };
   }
-  let immersiveVid = null;
-  function toggleImmersive() {
-    if (immersiveVid) { exitImmersive(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); return; }
+  // Plein écran GoonFap : on met en plein écran le LECTEUR du site (le bloc qui entoure la vidéo),
+  // et on force la vidéo à remplir l'écran. Les contrôles du site restent utilisables.
+  let imm = null; // { wrap, chain:[], v, fallback }
+  function playerWrapper(v) {
+    const vr = v.getBoundingClientRect(), va = Math.max(1, vr.width * vr.height);
+    let best = null;
+    for (let p = v.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      const r = p.getBoundingClientRect();
+      if (r.width * r.height > va * 2.2 + 1) break; // trop grand : ce n'est plus le lecteur
+      best = p;
+    }
+    return best;
+  }
+  async function toggleImmersive() {
+    if (imm) { if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); exitImmersive(); return; }
     const v = mainVideo();
     if (!v) { message('Aucune vidéo trouvée sur cette page 🤔', 2500, { speak: false }); return; }
-    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
-    immersiveVid = v;
+    if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+    const wrap = playerWrapper(v);
+    if (wrap) {
+      const chain = [];
+      for (let p = v.parentElement; p && p !== wrap; p = p.parentElement) chain.push(p);
+      imm = { wrap, chain, v };
+      wrap.classList.add('gf-fs'); chain.forEach(e => e.classList.add('gf-fs-chain')); v.classList.add('gf-fs-video');
+      try { await wrap.requestFullscreen({ navigationUI: 'hide' }); return; } catch (e) { exitImmersive(); }
+    }
+    // Secours : vidéo plaquée sur toute la page, page en plein écran
+    imm = { v, fallback: true, chain: [] };
     v.classList.add('gf-immersive-video');
-    document.documentElement.requestFullscreen().catch(() => {});
-    panel.classList.add('dim');
+    document.documentElement.requestFullscreen().catch(() => exitImmersive());
   }
   function exitImmersive() {
-    if (immersiveVid) immersiveVid.classList.remove('gf-immersive-video');
-    immersiveVid = null;
-    panel.classList.remove('dim');
+    if (!imm) return;
+    if (imm.wrap) imm.wrap.classList.remove('gf-fs');
+    imm.chain.forEach(e => e.classList.remove('gf-fs-chain'));
+    imm.v.classList.remove('gf-fs-video', 'gf-immersive-video');
+    imm = null;
+    if (host.parentNode !== document.documentElement && !document.fullscreenElement) document.documentElement.appendChild(host);
   }
   const onFs = () => {
     const fe = document.fullscreenElement;
-    if (!fe && immersiveVid) exitImmersive();
+    if (!fe && imm) exitImmersive();
     const target = fe && fe.tagName !== 'VIDEO' ? fe : document.documentElement;
     if (host.parentNode !== target) target.appendChild(host);
     if (fe && fe.tagName === 'VIDEO') message('Utilise le bouton ⛶ de GoonFap pour garder les messages en plein écran 😉', 4000, { speak: false });
@@ -535,10 +636,10 @@
         break;
       case 'edge':
         st.muteUntil = now + 15000; stopRumble(); clearTimeout(st.timer);
-        vis.timers.forEach(t => clearTimeout(t)); vis.timers.clear();
+        clearPend();
         talk('edge', 4500, { small: 'Au bord ? On coupe tout 15 secondes… respire.' });
         setMood('pause');
-        setTimeout(() => { if (alive) talk('resume', 2500); }, 15000);
+        setTimeout(() => { if (alive) talk(Math.random() < 0.5 ? 'praise' : 'resume', 3000); }, 15000);
         break;
       case 'cum':
         talk('cum', 6000, { gif: true });
@@ -559,8 +660,7 @@
     port.onMessage.addListener(m => {
       switch (m.type) {
         case 'onset': onOnset(m.s, m.at); break;
-        case 'veta': onVEta(m.id, m.eta); break;
-        case 'vhit': onVHit(m.id); break;
+        case 'vetas': onVEtas(m.etas); break;
         case 'vprof': vis.prof = m; drawPreview(); break;
         case 'vision': vis.ok = m.ok; break;
         case 'picked': onPicked(m.color); break;
@@ -573,7 +673,7 @@
     sendSettings();
   }
   function sendSettings() {
-    send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol } });
+    send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
   }
   function onSettings() { sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }
 
@@ -583,7 +683,7 @@
     if (!alive) return;
     alive = false;
     clearInterval(slow); clearTimeout(st.timer); clearTimeout(st.missTimer); clearTimeout(retry); stopTease(); stopRumble();
-    vis.timers.forEach(t => clearTimeout(t));
+    clearPend();
     exitImmersive();
     document.removeEventListener('fullscreenchange', onFs);
     window.removeEventListener('keydown', onKey, true);
