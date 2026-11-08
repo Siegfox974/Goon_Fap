@@ -95,6 +95,9 @@ Le panneau permet aussi de :
 ### Plein écran
 
 Utilise le **bouton plein écran du site**, ou **⛶** dans le panneau, qui fait la même chose. GoonFap s'affiche par-dessus et son panneau reste cliquable.
+**Si le plein écran ne tient pas** (il s'ouvre puis se referme, ou rien ne se passe) : ⛶ étire quand même la vidéo sur **toute la fenêtre**, sans bandes. Appuie alors sur **F11** pour masquer les barres de Chrome. ⛶ ou Échap pour revenir.
+Le diagnostic 🩺 contient le journal des entrées et sorties de plein écran.
+
 **Bandes noires sur les côtés ?** Le bouton **↔** du panneau a trois crans :
 
 - **Remplir** (par défaut) : l'image couvre tout l'écran, les bords sont un peu rognés.

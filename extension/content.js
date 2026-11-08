@@ -58,19 +58,21 @@
   // « Couche du dessus » du navigateur : GoonFap reste visible par-dessus TOUT, même le plein écran du site
   const usePopover = typeof host.showPopover === 'function';
   if (usePopover) host.setAttribute('popover', 'manual');
+  // Journal du plein écran (pour le diagnostic 🩺)
+  const fsLogs = [];
+  function fsLog(ev, extra) { fsLogs.push(`${(performance.now() / 1000).toFixed(1)}s ${ev}${extra ? ' ' + extra : ''}`); if (fsLogs.length > 20) fsLogs.shift(); }
   function raise() {
-    // En plein écran, Chrome rend tout ce qui est hors de l'élément plein écran non cliquable :
-    // GoonFap se place donc DANS le lecteur (sauf si c'est la balise vidéo elle-même).
+    const isOpen = () => { try { return usePopover && host.matches(':popover-open'); } catch (e) { return false; } };
     const fe = document.fullscreenElement;
-    const parent = fe && fe.tagName !== 'VIDEO' ? fe : document.documentElement;
-    if (host.parentNode !== parent) { try { if (usePopover && host.matches(':popover-open')) host.hidePopover(); } catch (e) {} parent.appendChild(host); }
-    if (usePopover) {
-      try { if (host.matches(':popover-open')) host.hidePopover(); host.showPopover(); } catch (e) {}
-    } else {
-      const fe = document.fullscreenElement;
-      const target = fe && fe.tagName !== 'VIDEO' ? fe : document.documentElement;
-      if (host.parentNode !== target) target.appendChild(host);
+    if (fe && fe.tagName !== 'VIDEO') {
+      // En plein écran du lecteur : GoonFap se place DANS le lecteur, sans toucher à la couche du dessus
+      // (sur certains Chrome, ouvrir une couche du dessus fait ressortir du plein écran).
+      if (isOpen()) { try { host.hidePopover(); } catch (e) {} }
+      if (host.parentNode !== fe) fe.appendChild(host);
+      return;
     }
+    if (host.parentNode !== document.documentElement) { if (isOpen()) { try { host.hidePopover(); } catch (e) {} } document.documentElement.appendChild(host); }
+    if (usePopover) { try { if (isOpen()) host.hidePopover(); host.showPopover(); } catch (e) {} }
   }
   const root = host.attachShadow({ mode: 'open' });
   root.innerHTML = `
@@ -425,6 +427,7 @@
       goonfap: chrome.runtime.getManifest().version, site: location.hostname, browser: navigator.userAgent.replace(/.*(Chrome|Edg)\/(\d+).*/, '$1 $2'),
       video: v ? { size: [Math.round(v.getBoundingClientRect().width), Math.round(v.getBoundingClientRect().height)], inShadowOrIframe: !document.contains(v), t: +v.currentTime.toFixed(2), duration: +(v.duration || 0).toFixed(1), paused: v.paused, rvfc: !!v.requestVideoFrameCallback, clock: vclock.ok, parents: (() => { const a = []; for (let q = v.parentElement; q && a.length < 4; q = q.parentElement) a.push(desc(q)); return a; })() } : null,
       fullscreen: desc(fe), hostIn: desc(host.parentElement), popover: usePopover ? host.matches(':popover-open') : 'non', screen: [innerWidth, innerHeight],
+      fsLog: fsLogs, cinema: !!(imm && imm.keep), cover: S.cover,
       hid, pad: p ? { id: p.id, vib: !!p.vibrationActuator } : null, padPage: mainPad,
       source: S.source, used: src(), fOffset: S.fOffset, fMode: S.fMode, vOffset: S.vOffset, lane: !!S.lane, vision: vis.ok,
       funscript: fsData ? { from: fsData.from, actions: fsData.acts.length, lows: fsData.lows.length, highs: fsData.highs.length, first: fsData.acts[0] && fsData.acts[0].at, last: fsData.acts[fsData.acts.length - 1].at } : null,
@@ -766,26 +769,38 @@
     return best;
   }
   async function toggleImmersive() {
-    if (document.fullscreenElement) { await document.exitFullscreen().catch(() => {}); exitImmersive(); return; }
+    if (imm || document.fullscreenElement) {
+      fsLog('⛶ sortie demandée');
+      if (imm) imm.keep = false;
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      exitImmersive(); applyCover(); return;
+    }
     const v = mainVideo();
     if (!v) { message('Aucune vidéo trouvée sur cette page 🤔', 2500, { speak: false }); return; }
     const wrap = playerWrapper(v);
+    fsLog('⛶ demande', wrap ? wrap.tagName.toLowerCase() + '.' + String(wrap.className).split(' ')[0] : 'page');
     try { await (wrap || document.documentElement).requestFullscreen({ navigationUI: 'hide' }); }
     catch (e) {
-      try { await document.documentElement.requestFullscreen(); }
-      catch (e2) { message('Le navigateur a refusé le plein écran — appuie sur F11 😉', 3500, { speak: false }); return; }
+      fsLog('refus', e.message);
+      try { await document.documentElement.requestFullscreen(); } catch (e2) { fsLog('refus page', e2.message); }
     }
     setTimeout(() => {
-      if (!document.fullscreenElement) return;
+      if (!document.fullscreenElement) {
+        // Refusé, ou ressorti tout seul : la vidéo remplit au moins toute la fenêtre
+        plaque(v, true); applyCover();
+        fsLog('repli : vidéo sur toute la fenêtre');
+        message('Plein écran bloqué par le navigateur 😕<small>La vidéo remplit la fenêtre : appuie sur F11 pour cacher les barres de Chrome · ⛶ ou Échap pour revenir</small>', 6000, { speak: false });
+        return;
+      }
       const r = v.getBoundingClientRect();
       if (r.width < innerWidth * 0.9 && r.height < innerHeight * 0.9) plaque(v); // la vidéo est restée petite
-    }, 500);
+    }, 900);
   }
-  function plaque(v) {
+  function plaque(v, keep = false) {
     if (imm) return;
     const anc = [];
     for (let p = v.parentElement; p && p !== document.documentElement; p = p.parentElement) anc.push(p);
-    imm = { v, anc, hadControls: v.controls };
+    imm = { v, anc, hadControls: v.controls, keep }; // keep : rester ainsi même hors plein écran (mode fenêtre)
     anc.forEach(e => e.classList.add('gf-fs-anc'));
     v.classList.add('gf-immersive-video');
     v.controls = true;
@@ -800,7 +815,7 @@
   // Remplir l'écran : en plein écran, l'image est zoomée pour supprimer les bandes noires (bords rognés).
   let coverV = null, coverAnc = [];
   function applyCover() {
-    const on = !!(S.cover && document.fullscreenElement);
+    const on = !!(S.cover && (document.fullscreenElement || (imm && imm.keep)));
     const v = on ? mainVideo() : null;
     if (coverV && (coverV !== v || S.cover !== 'zoom')) coverV.style.removeProperty('transform');
     if (coverV && coverV !== v) {
@@ -821,10 +836,12 @@
   }
   const onFs = () => {
     const fe = document.fullscreenElement;
+    fsLog(fe ? 'entrée plein écran' : 'sortie plein écran', fe ? fe.tagName.toLowerCase() + '.' + String(fe.className).split(' ')[0] : '');
     setTimeout(applyCover, 300);
-    if (!fe) exitImmersive();
+    if (!fe && !(imm && imm.keep)) exitImmersive();
     raise(); // repasse au-dessus du nouvel élément plein écran
     setTimeout(raise, 150); // Chrome finit parfois de placer l'élément plein écran juste après l'événement
+    if (imm && imm.keep && fe) imm.keep = false;
     panel.classList.toggle('dim', !!fe);
   };
   document.addEventListener('fullscreenchange', onFs);
@@ -913,6 +930,9 @@
     place(tgt, Math.max(r.x, Math.min(r.x + r.w, e.clientX)) - 1, r.y - 6, 2, r.h + 12);
   });
   function place(el, x, y, w, h) { Object.assign(el.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' }); }
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && imm && imm.keep && !document.fullscreenElement) { imm.keep = false; exitImmersive(); applyCover(); fsLog('Échap : fin du mode fenêtre'); }
+  }, true);
   const onKey = e => { if (calib && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); endCalib(false); } };
   window.addEventListener('keydown', onKey, true);
 
