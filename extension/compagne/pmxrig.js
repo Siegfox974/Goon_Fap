@@ -85,6 +85,29 @@ export async function loadPmx(url, physicsWanted) {
   return rig;
 }
 
+/** Lecture directe d'une animation : chaque piste est évaluée et réappliquée à CHAQUE image.
+ * (L'AnimationMixer de three.js n'écrit une valeur que lorsqu'elle change : les os à une seule
+ * image clé — bassin, tout-parent… — retombaient au repos après la remise à zéro du squelette.) */
+export function makeSampler(rig, clip) {
+  const byName = new Map(rig.mesh.skeleton.bones.map(b => [b.name, b]));
+  const dict = rig.mesh.morphTargetDictionary || {};
+  const entries = [];
+  for (const t of clip.tracks) {
+    const m = /^\.bones\[(.+?)\]\.(quaternion|position)$/.exec(t.name);
+    if (m) { const b = byName.get(m[1]); if (b) entries.push({ b, prop: m[2], it: t.createInterpolant() }); continue; }
+    const mm = /^\.morphTargetInfluences\[(.+?)\]$/.exec(t.name);
+    if (mm && dict[mm[1]] !== undefined) entries.push({ morph: dict[mm[1]], it: t.createInterpolant() });
+  }
+  return t => {
+    for (const e of entries) {
+      const v = e.it.evaluate(t);
+      if (e.morph !== undefined) rig.mesh.morphTargetInfluences[e.morph] = v[0];
+      else if (e.prop === 'quaternion') e.b.quaternion.set(v[0], v[1], v[2], v[3]).normalize();
+      else e.b.position.set(v[0], v[1], v[2]);
+    }
+  };
+}
+
 /** Charge une animation .vmd pour ce modèle (lecture native, avec IK et morphs). */
 export function loadVmdFor(rig, url) {
   return new Promise((res, rej) => rig.loader.loadAnimation(url, rig.mesh, clip => {

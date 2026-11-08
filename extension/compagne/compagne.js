@@ -8,7 +8,7 @@ import { nudify, clothes } from './nudify.js';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from './lib/three-vrm-animation.module.js';
 import * as P from './poses.js';
 import * as VMD from './vmd.js';
-import { loadPmx, loadVmdFor } from './pmxrig.js';
+import { loadPmx, loadVmdFor, makeSampler } from './pmxrig.js';
 
 // nude : 'nue' | 'strip' | 'habillee' ; frame : 'buste' | 'entiere'
 // scene : 'auto' | 'danse' | 'masturbation' | 'fellation' ; view : 'pov' | 'cote'
@@ -19,7 +19,7 @@ let M = null, F = null, R = null;            // mesures du modèle, fellation (s
 const anims = {};                             // animations .vrma par scène (dossier animations/)
 let mixer = null, action = null, actionScene = null;
 let feetRest = null, vmdCur = null, vmdTime = 0;            // animation MMD en cours
-let pmxMixer = null, pmxPlaying = null, resetPhys = false;    // modèle MMD : lecture native des .vmd, physique
+let pmxPlaying = null, resetPhys = false;    // modèle MMD : lecture native des .vmd, physique
 let licenceOk = true; // la licence du modèle autorise-t-elle la nudité / le sexe ?
 let vrm = null, renderer, scene, camera, clock, skin = null, origTex = null, nudeRep = null, wear = [];
 
@@ -115,7 +115,7 @@ async function loadAnims(loader) {
       (anims[sc] = anims[sc] || []).push({ vmd: clip });
     } catch (e) { post({ type: 'anim-error', file: f, error: String(e && e.message || e) }); }
   }
-  if (Object.values(anims).some(l => l.some(a => a.vmd))) { if (!vrm.isPmx) feetRest = VMD.restFeet(vrm, M); else pmxMixer = new THREE.AnimationMixer(vrm.mesh); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') + (a.vmd.pmxClip && a.vmd.pmxClip.userData.missing.length ? ` [${a.vmd.pmxClip.userData.missing.length}/${a.vmd.pmxClip.userData.used} os absents du modèle : ${a.vmd.pmxClip.userData.missing.slice(0, 12).join(' ')}]` : '') : 'vrma').join(',')) }); }
+  if (Object.values(anims).some(l => l.some(a => a.vmd))) { if (!vrm.isPmx) feetRest = VMD.restFeet(vrm, M); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') + (a.vmd.pmxClip && a.vmd.pmxClip.userData.missing.length ? ` [${a.vmd.pmxClip.userData.missing.length}/${a.vmd.pmxClip.userData.used} os absents du modèle : ${a.vmd.pmxClip.userData.missing.slice(0, 12).join(' ')}]` : '') : 'vrma').join(',')) }); }
   const files = all.filter(f => /\.vrma$/i.test(f));
   if (!files.length || vrm.isPmx) return; // .vrma : modèles VRM seulement
   const l = new GLTFLoader(); l.register(p => new VRMAnimationLoaderPlugin(p));
@@ -134,8 +134,8 @@ async function loadAnims(loader) {
 function poseVmd(clip, f) {
   if (vrm.isPmx && clip.pmxClip) {
     vrm.resetAll();
-    if (pmxPlaying !== clip) { pmxMixer.stopAllAction(); clip.action = clip.action || pmxMixer.clipAction(clip.pmxClip); clip.action.play(); pmxPlaying = clip; }
-    clip.action.time = (f / 30) % clip.pmxClip.duration; pmxMixer.update(0);
+    clip.sample = clip.sample || makeSampler(vrm, clip.pmxClip);
+    clip.sample((f / 30) % Math.max(1 / 30, clip.pmxClip.duration));
     vrm.solve(true);                                   // IK des jambes + os automatiques
     return null;                                        // les mimiques sont posées par l'animation elle-même
   }
