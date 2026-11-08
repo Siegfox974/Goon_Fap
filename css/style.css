@@ -77,6 +77,8 @@ select { background: var(--bg2); color: var(--text); border: 1px solid var(--lin
 .pad-status.warn .dot { background: #ffb13d; box-shadow: 0 0 10px #ffb13d; }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; padding: 0 24px; max-width: 1200px; margin: 0 auto; }
+.ext-banner { max-width: 1200px; margin: 0 auto 18px; width: calc(100% - 48px); }
+.ext-banner code { color: var(--pink2); }
 .card.wide { grid-column: 1 / -1; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
 .tab { background: transparent; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: .95rem; font-family: inherit; }

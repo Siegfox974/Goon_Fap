@@ -3,7 +3,44 @@
 FapHero pour adultes (18+) qui utilise une **manette PS4 (DualShock 4)** comme vibro.
 Tout tourne dans le navigateur : aucune installation, aucune vidéo envoyée sur Internet.
 
-## Lancer
+## Sur un site porno : l'extension Chrome (recommandé)
+
+L'extension marche sur **n'importe quel site** (Eporner ou autre) :
+
+- elle capte le son de l'onglet ;
+- elle détecte chaque beat de la vidéo en temps réel ;
+- elle fait vibrer la manette dessus, à **100 % par défaut** ;
+- elle affiche la piste, les messages et les boutons **par-dessus la vidéo du site**.
+
+### Installer (une seule fois)
+
+1. Ouvre `chrome://extensions` dans Chrome (ou `edge://extensions` dans Edge).
+2. Active le **Mode développeur** (interrupteur en haut à droite).
+3. Clique sur **Charger l'extension non empaquetée** et choisis le dossier **`extension`** du projet.
+4. Épingle l'icône 💗 GoonFap dans la barre d'outils.
+
+### Utiliser
+
+1. Branche la DualShock 4 (USB ou Bluetooth) et appuie sur un bouton.
+2. Ouvre la vidéo FapHero sur le site.
+3. Clique sur l'icône GoonFap, puis sur **▶ Lancer sur cet onglet**.
+4. Lance la vidéo : la manette vibre sur chaque beat.
+5. Pour le plein écran, utilise le bouton **⛶ de GoonFap**, qui garde les messages visibles. Si le plein écran du site les cache, c'est le cas.
+
+Le panneau en haut à droite permet de :
+
+- régler la puissance ;
+- mettre la vidéo en lecture ou en pause ;
+- déclencher **🥵 Au bord !** : stop de 15 s ;
+- déclencher **💦 Je jouis** : vibration longue à fond.
+
+Quand le tempo est stable, GoonFap le verrouille 🔒 et **anticipe** les vibrations pour qu'elles tombent pile sur le beat.
+Pendant les pauses de la vidéo, des **battements de cœur** légers continuent de te taquiner.
+
+Si ça vibre sur des bruits qui ne sont pas des beats, monte la **sensibilité** dans le popup.
+Si des beats sont ratés, baisse-la ou change les « Sons à suivre ».
+
+## L'application web (vidéos sur ton PC, programmes générés)
 
 **Windows :** double-clique sur **`Lancer-GoonFap.bat`**. Le serveur démarre et le navigateur s'ouvre tout seul sur http://localhost:8000.
 Laisse la fenêtre noire ouverte pendant que tu joues.

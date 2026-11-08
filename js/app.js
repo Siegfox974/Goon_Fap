@@ -27,7 +27,7 @@
   const SETTINGS = ['power', 'pulse', 'mix', 'minutes', 'sens', 'gap', 'band', 'finale', 'phone-vibe', 'click-sound', 'bgop', 'level', 'talk'];
   function loadSettings() {
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem('goonfap:settings') || '{}'); } catch (e) {}
+    try { saved = JSON.parse(localStorage.getItem('goonfap:settings:v2') || '{}'); } catch (e) {}
     SETTINGS.forEach(id => {
       const el = document.getElementById(id);
       if (!el || saved[id] === undefined) return;
@@ -38,7 +38,7 @@
   function saveSettings() {
     const o = { preset: state.preset };
     SETTINGS.forEach(id => { const el = document.getElementById(id); o[id] = el.type === 'checkbox' ? el.checked : el.value; });
-    try { localStorage.setItem('goonfap:settings', JSON.stringify(o)); } catch (e) {}
+    try { localStorage.setItem('goonfap:settings:v2', JSON.stringify(o)); } catch (e) {}
   }
   function opts() {
     return {
