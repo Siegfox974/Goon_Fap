@@ -304,7 +304,13 @@ async function load() {
 // ---------- Modèle MMD (.pmx) ----------
 async function loadPmxModel(path) {
   // physique (cheveux, seins…) : moteur Ammo, chargé si possible
-  try { if (typeof Ammo === 'function') globalThis.Ammo = await Ammo(); } catch (e) {}
+  // (délai maximum : si le moteur ne démarre pas, elle s'affiche quand même, sans physique)
+  try {
+    if (typeof Ammo === 'function') {
+      const lib = await Promise.race([Ammo(), new Promise(r => setTimeout(() => r(null), 6000))]);
+      globalThis.Ammo = lib || undefined;
+    }
+  } catch (e) { globalThis.Ammo = undefined; }
   const url = chrome.runtime.getURL(path.split('/').map(encodeURIComponent).join('/'));
   vrm = await loadPmx(url, !!globalThis.Ammo && typeof globalThis.Ammo !== 'function');
   scene.add(vrm.mesh);
