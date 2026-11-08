@@ -41,6 +41,48 @@ const Beatmap = (() => {
     denial: ['Pas aujourd\'hui. Range-le 🔒', 'Fini. Tu ne jouis pas ce soir 🔒', 'Déni. Tu reviendras demain 😈'],
   };
 
+  // Version explicite (choisie avec « Ton des messages : Explicite »)
+  const HOT = {
+    warm: [
+      'Prends-toi en main… et caresse-toi lentement 😏', 'Doucement… sens chaque centimètre.',
+      'Touche-toi comme si c\'était moi qui le faisais.', 'Lentement… je veux te voir savourer.',
+      'Serre un peu plus… et descends tout doucement.', 'Laisse ton sexe gonfler sous tes doigts…',
+    ],
+    medium: [
+      'Branle-toi au rythme, rien d\'autre 😈', 'C\'est bon de se toucher comme ça, hein ?',
+      'Je veux t\'entendre gémir.', 'Ton sexe adore cette vibration… continue.',
+      'T\'es tellement excité·e… ça se voit 🔥', 'Écarte bien les cuisses et suis le tempo.',
+    ],
+    fast: [
+      'Plus vite ! Branle-toi plus fort ! 💦', 'Ne t\'arrête pas, petit·e cochon·ne 😈',
+      'Défonce-toi au rythme, maintenant !', 'Plus fort ! Je veux te voir trembler !',
+      'Tu mouilles, tu bandes… tu dégoulines. Encore !', 'Frotte la manette contre toi, fort ! 🎮💦',
+    ],
+    tease: [
+      'Juste le bout… effleure à peine 😏', 'Fais glisser la manette sur toi… sans appuyer.',
+      'Petits coups… je veux que tu supplies.',
+    ],
+    pause: [
+      'STOP ✋ Lâche-toi. Tu ne te touches plus.', 'Mains en l\'air ! Regarde comme t\'es excité·e…',
+      'Ne touche plus. Laisse ton sexe palpiter tout seul.', 'Stop. Tu sens comme ça pulse ? Attends mon ordre.',
+      'Interdiction de te toucher. Respire… et souffre un peu 😈',
+    ],
+    edge: [
+      'Tu vas jouir ? Interdit. Tiens bon 😈', 'Au bord… tu sens que ça monte ? Pas encore !',
+      'Tu es tout près… retiens-toi pour moi.', 'Je te pousse jusqu\'au bord… et tu ne lâches rien.',
+    ],
+    cum: ['JOUIS ! Maintenant ! Lâche tout ! 💦', 'Vas-y, jouis pour moi ! 💦', 'Gicle, explose, tu l\'as mérité ! 💦'],
+    ruin: ['Lâche-le ! Mains en l\'air ! Regarde-toi jouir pour rien 😈', 'STOP ! Orgasme ruiné. Quel dommage… 😈'],
+    denial: ['Pas le droit de jouir. Range ça 🔒', 'Fini. Tu resteras frustré·e ce soir 🔒', 'Déni. Tu y penseras toute la nuit 😈'],
+  };
+
+  /** Tire un message au hasard. kind = warm|medium|fast|tease|pause|edge|cum|ruin|denial, level = soft|hot */
+  function say(kind, level = 'soft', r = Math.random) {
+    const pool = level === 'hot' ? HOT[kind] : MSG[kind];
+    return pool && pool.length ? pick(r, pool) : '';
+  }
+  const kindForBpm = bpm => bpm < 90 ? 'warm' : bpm < 150 ? 'medium' : 'fast';
+
   // ---------- Presets ----------
   const PRESETS = {
     douceur:   { name: 'Douceur', icon: '🌸', desc: 'Lent et sensuel, quelques pauses.',
@@ -111,7 +153,7 @@ const Beatmap = (() => {
     const bodyEnd = duration - finaleLen;
     let t = LEAD_IN, lastWasPause = true;
 
-    phases.push({ t: 0, kind: 'pause', label: 'Prépare-toi', msg: 'Prépare-toi… 😏', end: LEAD_IN });
+    phases.push({ t: 0, kind: 'pause', label: 'Prépare-toi', msg: 'Prépare-toi… 😏', end: LEAD_IN, quiet: true });
 
     while (t < bodyEnd - 5) {
       const p = clamp(t / bodyEnd, 0, 1);
@@ -119,7 +161,7 @@ const Beatmap = (() => {
       if (!lastWasPause && r() < P.pause) {
         const len = Math.min(between(r, P.pauseLen), bodyEnd - t - 2);
         if (len > 2) {
-          phases.push({ t, end: t + len, kind: 'pause', label: 'STOP', msg: pick(r, MSG.pause) });
+          phases.push({ t, end: t + len, kind: 'pause', label: 'STOP', mk: 'pause', msg: pick(r, MSG.pause) });
           t += len; lastWasPause = true; continue;
         }
       }
@@ -134,13 +176,14 @@ const Beatmap = (() => {
       const len = Math.min(between(r, P.seg), bodyEnd - t);
       phases.push({ t, end: t + len, kind: 'stroke',
         label: isEdge ? 'Au bord…' : (pattern === 'tease' ? 'Taquinerie' : `${Math.round(bpm0)} BPM`),
+        mk: isEdge ? 'edge' : (pattern === 'tease' ? 'tease' : kindForBpm(bpm0)),
         msg: isEdge ? pick(r, MSG.edge) : (pattern === 'tease' ? pick(r, MSG.tease) : msgFor(r, bpm0)) });
       pushStroke(beats, t, len, bpm0, bpm1, pattern === 'tease' ? 'tease' : pattern);
       t += len; lastWasPause = false;
       // Après un edge, pause obligatoire
       if (isEdge && t < bodyEnd - 8) {
         const pl = between(r, P.pauseLen);
-        phases.push({ t, end: t + pl, kind: 'pause', label: 'STOP', msg: pick(r, MSG.pause) });
+        phases.push({ t, end: t + pl, kind: 'pause', label: 'STOP', mk: 'pause', msg: pick(r, MSG.pause) });
         t += pl; lastWasPause = true;
       }
     }
@@ -148,16 +191,16 @@ const Beatmap = (() => {
     // ---- Finale ----
     const fStart = Math.max(t, bodyEnd);
     const climaxLen = finaleLen * 0.75;
-    phases.push({ t: fStart, end: fStart + climaxLen, kind: 'finale', label: 'FINALE', msg: 'La dernière ligne droite… 🔥' });
+    phases.push({ t: fStart, end: fStart + climaxLen, kind: 'finale', label: 'FINALE', mk: 'fast', msg: 'La dernière ligne droite… 🔥' });
     pushStroke(beats, fStart, climaxLen, Math.max(140, P.bpm[1] * 0.8), Math.max(200, P.bpm[1] * 1.1), 'steady');
     const climax = fStart + climaxLen;
     if (finale === 'cum') {
       beats.push({ t: climax, s: 1, d: 2500 });
-      phases.push({ t: climax, kind: 'end', label: '💦', msg: pick(r, MSG.cum) });
+      phases.push({ t: climax, kind: 'end', label: '💦', mk: 'cum', msg: pick(r, MSG.cum) });
     } else if (finale === 'ruin') {
-      phases.push({ t: climax, kind: 'end', label: 'Ruiné', msg: pick(r, MSG.ruin) });
+      phases.push({ t: climax, kind: 'end', label: 'Ruiné', mk: 'ruin', msg: pick(r, MSG.ruin) });
     } else {
-      phases.push({ t: climax - 3, kind: 'end', label: 'Déni', msg: pick(r, MSG.denial) });
+      phases.push({ t: climax - 3, kind: 'end', label: 'Déni', mk: 'denial', msg: pick(r, MSG.denial) });
       // On coupe les derniers beats juste avant le climax
       for (let i = beats.length - 1; i >= 0 && beats[i].t > climax - 3; i--) beats.pop();
     }
@@ -266,9 +309,9 @@ const Beatmap = (() => {
         const segBeats = beats.filter(b => b.t >= segStart && b.t <= beats[i - 1].t);
         const span = beats[i - 1].t - segStart;
         const bpm = span > 0 ? (segBeats.length - 1) / span * 60 : 0;
-        phases.push({ t: segStart, end: beats[i - 1].t, kind: 'stroke', label: bpm ? `~${Math.round(bpm)} BPM` : 'Rythme', msg: msgFor(r, bpm) });
+        phases.push({ t: segStart, end: beats[i - 1].t, kind: 'stroke', label: bpm ? `~${Math.round(bpm)} BPM` : 'Rythme', mk: kindForBpm(bpm), msg: msgFor(r, bpm) });
         if (i < beats.length) {
-          phases.push({ t: beats[i - 1].t + 0.5, end: beats[i].t, kind: 'pause', label: 'STOP', msg: pick(r, MSG.pause) });
+          phases.push({ t: beats[i - 1].t + 0.5, end: beats[i].t, kind: 'pause', label: 'STOP', mk: 'pause', msg: pick(r, MSG.pause) });
           segStart = beats[i].t;
         }
       }
@@ -312,5 +355,5 @@ const Beatmap = (() => {
   function saveForFile(file, map) { try { localStorage.setItem(keyFor(file), JSON.stringify(map)); } catch (e) {} }
   function loadForFile(file) { try { const s = localStorage.getItem(keyFor(file)); return s ? parse(s) : null; } catch (e) { return null; } }
 
-  return { PRESETS, MSG, generate, analyze, fromRecording, parse, download, saveForFile, loadForFile, finalize };
+  return { PRESETS, MSG, HOT, say, kindForBpm, generate, analyze, fromRecording, parse, download, saveForFile, loadForFile, finalize };
 })();

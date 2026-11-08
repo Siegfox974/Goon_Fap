@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<!-- Fond personnalisable (GIF/image choisi par l'utilisateur), teinté de rose -->
+<div id="bg-layer" class="hidden"><img id="bg-img" alt=""><video id="bg-vid" muted loop playsinline autoplay></video></div>
 
 <!-- ============ PORTE 18+ ============ -->
 <section id="age-gate" class="screen active">
@@ -39,7 +41,8 @@
     <!-- Manette -->
     <div class="card">
       <h2>🎮 Manette</h2>
-      <p class="small">DualShock 4 en USB ou Bluetooth. Navigateur conseillé : <b>Chrome</b> ou <b>Edge</b> (Firefox ne gère pas la vibration).</p>
+      <p class="small">DualShock 4 en USB ou Bluetooth. Navigateur conseillé : <b>Chrome</b> ou <b>Edge</b> (Firefox ne gère pas la vibration).
+        Les boutons de la manette sont <b>désactivés</b> : tu peux la frotter partout sans rien déclencher 😏 — tout se contrôle à la souris ou au clavier.</p>
       <div class="row">
         <button id="test-light" class="btn">Test doux</button>
         <button id="test-strong" class="btn">Test fort</button>
@@ -63,8 +66,46 @@
         <input type="file" id="video-file" accept="video/*,audio/*">
         <span id="video-name">Choisir une vidéo…</span>
       </label>
+      <div class="row url-row">
+        <input type="url" id="video-url" placeholder="…ou colle un lien direct (.mp4, .webm)">
+        <button id="video-url-go" class="btn">OK</button>
+      </div>
       <button id="clear-video" class="btn ghost hidden">Retirer la vidéo</button>
+      <p class="small">La vidéo est lue en plein écran et l'app s'affiche <b>par-dessus</b> : piste de beats, messages coquins, compteur.</p>
       <p id="saved-map-hint" class="hint hidden"></p>
+    </div>
+
+    <!-- Ambiance -->
+    <div class="card">
+      <h2>🔥 Ambiance</h2>
+      <p class="small">Mets ton GIF (ou image / courte vidéo) préféré en fond de l'app. Il reste sur ton appareil.</p>
+      <label class="file">
+        <input type="file" id="bg-file" accept="image/*,video/*">
+        <span id="bg-name">Choisir un GIF de fond…</span>
+      </label>
+      <div class="row url-row">
+        <input type="url" id="bg-url" placeholder="…ou colle le lien d'un GIF">
+        <button id="bg-url-go" class="btn">OK</button>
+      </div>
+      <button id="bg-clear" class="btn ghost hidden">Retirer le fond</button>
+      <label class="range">Visibilité du fond <output id="o-bgop"></output>
+        <input type="range" id="bgop" min="0.1" max="1" step="0.05" value="0.55"></label>
+      <div class="row wrap">
+        <label class="select">Ton des messages
+          <select id="level">
+            <option value="soft">Coquin 😏</option>
+            <option value="hot" selected>Explicite 🔥</option>
+          </select>
+        </label>
+        <label class="select">Quantité de messages
+          <select id="talk">
+            <option value="0">Aucun</option>
+            <option value="1">Peu</option>
+            <option value="2" selected>Normal</option>
+            <option value="3">Beaucoup</option>
+          </select>
+        </label>
+      </div>
     </div>
 
     <!-- Rythme -->
@@ -115,7 +156,7 @@
 
       <div class="tabpane" data-pane="record">
         <p>La vidéo se lance, et tu tapes le rythme toi-même :
-          <b>✕ / Espace</b> = beat normal, <b>□ / B</b> = beat fort.
+          <b>Espace</b> ou <b>clic gauche</b> = beat normal, <b>B</b> ou <b>clic droit</b> = beat fort.
           À la fin, le beatmap est sauvegardé pour cette vidéo et tu peux l'exporter.</p>
       </div>
 
@@ -131,8 +172,9 @@
   <div class="startbar">
     <button id="start" class="btn primary big">C'est parti 🔥</button>
     <p class="small controls-help">
-      En jeu : <b>Options / Espace</b> pause · <b>○ / Échap</b> quitter · <b>R1/R2</b> plus fort · <b>L1/L2</b> moins fort ·
-      <b>✕ / E</b> « je suis au bord ! » (stop 15 s) · <b>△ / H</b> masquer la piste
+      En jeu, à la souris (barre de boutons en haut) ou au clavier :
+      <b>Espace</b> pause · <b>Échap</b> quitter · <b>↑ / ↓</b> vibration plus / moins forte ·
+      <b>E</b> « je suis au bord ! » (stop 15 s) · <b>H</b> masquer la piste
     </p>
   </div>
 </section>
@@ -147,6 +189,15 @@
     <div id="hud-phase"></div>
     <div id="hud-stats"><span id="hud-bpm">— BPM</span> · <span id="hud-time">0:00</span> · <span id="hud-power">100%</span></div>
   </div>
+  <div id="game-controls">
+    <button class="gc" data-act="pause" title="Pause (Espace)">⏸</button>
+    <button class="gc" data-act="down" title="Moins fort (↓)">−</button>
+    <button class="gc" data-act="up" title="Plus fort (↑)">+</button>
+    <button class="gc edge" data-act="edge" title="Je suis au bord ! (E)">🥵 Au bord !</button>
+    <button class="gc" data-act="track" title="Masquer la piste (H)">👁</button>
+    <button class="gc" data-act="quit" title="Quitter (Échap)">✕</button>
+  </div>
+  <div id="rec-zone" class="hidden">Clique ici pour taper le rythme<br><small>clic gauche = normal · clic droit = fort</small></div>
   <div id="message"></div>
   <canvas id="highway"></canvas>
   <div id="pause-overlay" class="hidden">

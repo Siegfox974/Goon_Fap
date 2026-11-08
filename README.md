@@ -5,18 +5,23 @@ Tout tourne dans le navigateur : aucune installation, aucune vidéo envoyée sur
 
 ## Lancer
 
-La Gamepad API demande une page servie en `http://localhost` ou en HTTPS :
+**Windows :** double-clique sur **`Lancer-GoonFap.bat`**. Le serveur démarre et le navigateur s'ouvre tout seul sur http://localhost:8000.
+Laisse la fenêtre noire ouverte pendant que tu joues.
+
+**À la main :**
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Puis ouvre http://localhost:8000 dans **Chrome** ou **Edge** (Firefox ne gère pas la vibration des manettes).
-Ça marche aussi en ligne avec GitHub Pages.
+Puis ouvre **http://localhost:8000** dans **Chrome** ou **Edge**. La commande seule ne fait que démarrer le serveur : il faut ouvrir cette adresse dans le navigateur. Firefox ne fait pas vibrer les manettes.
 
-1. Branche la DualShock 4 (USB ou Bluetooth) et appuie sur un bouton.
-2. Règle la puissance, la durée des pulsations et le mélange des moteurs, puis fais un test.
-3. Choisis une vidéo (ou rien) et une source de rythme, puis **C'est parti**.
+1. Branche la DualShock 4 (USB ou Bluetooth) et appuie sur un bouton pour qu'elle soit détectée.
+2. Règle la puissance et fais un test.
+3. Choisis une vidéo (fichier ou lien direct) : elle est lue en plein écran et l'app s'affiche par-dessus.
+4. Dans **Ambiance**, mets ton GIF de fond et choisis le ton des messages (coquin ou explicite).
+
+La manette sert **uniquement de vibro** : ses boutons ne déclenchent rien, pour pouvoir la frotter sans risque. Tout se contrôle à la souris ou au clavier.
 
 ## Les sources de rythme
 
@@ -29,16 +34,17 @@ Puis ouvre http://localhost:8000 dans **Chrome** ou **Edge** (Firefox ne gère p
 
 ## Contrôles en jeu
 
-| Manette | Clavier | Action |
-|---|---|---|
-| Options | Espace / P | Pause |
-| ○ | Échap | Quitter |
-| R1 / R2 | ↑ | Vibration plus forte |
-| L1 / L2 | ↓ | Vibration moins forte |
-| ✕ | E | « Je suis au bord ! » : stop de 15 s |
-| △ | H | Afficher/masquer la piste |
+Barre de boutons en haut à droite (elle se cache quand la souris ne bouge plus), ou clavier :
 
-En mode enregistrement : ✕ / Espace = beat normal, □ / B = beat fort.
+| Clavier | Action |
+|---|---|
+| Espace / P | Pause |
+| Échap | Quitter |
+| ↑ / ↓ | Vibration plus / moins forte |
+| E | « Je suis au bord ! » : stop de 15 s |
+| H | Afficher/masquer la piste |
+
+En mode enregistrement : Espace ou clic gauche = beat normal, B ou clic droit = beat fort.
 
 ## Format beatmap
 

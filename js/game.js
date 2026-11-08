@@ -119,9 +119,24 @@ class Session {
         const ph = this.phases[pi];
         if (ph) {
           this.ui.onPhase(ph.label || '');
-          if (ph.msg) this.ui.onMessage(ph.msg, ph.kind === 'end' ? 6000 : 3000);
-          if (ph.kind === 'end') { this.endAt = t + 7; this.stats.finished = ph.msg; }
+          const msg = (ph.mk && Beatmap.say(ph.mk, this.opts.level)) || ph.msg;
+          if (msg && (this.opts.talk > 0 || ph.kind === 'end' || ph.kind === 'pause')) {
+            this.ui.onMessage(msg, ph.kind === 'end' ? 6000 : 3500);
+          }
+          this.nextTalk = t + this.talkGap();
+          if (ph.kind === 'end') { this.endAt = t + 7; this.stats.finished = msg; }
         }
+      }
+
+      // Messages coquins réguliers pendant qu'on se touche
+      if (this.opts.talk > 0 && !this.opts.record && t >= (this.nextTalk || 0) && t >= this.muteUntil) {
+        const ph = this.phases[this.phaseIdx];
+        const bpm = this.currentBpm(t);
+        let kind = null;
+        if (ph && ph.kind === 'pause' && ph.end - t > 4) kind = 'pause';
+        else if (bpm) kind = ph && (ph.mk === 'edge' || ph.mk === 'tease') && Math.random() < 0.5 ? ph.mk : Beatmap.kindForBpm(bpm);
+        if (kind && (!ph || ph.kind !== 'end')) this.ui.onMessage(Beatmap.say(kind, this.opts.level), 3200);
+        this.nextTalk = t + this.talkGap();
       }
 
       // Beats
@@ -149,6 +164,11 @@ class Session {
 
     this.render(t);
     this.updateHud(t);
+  }
+
+  talkGap() {
+    const base = [0, 22, 12, 6][this.opts.talk] || 12;
+    return base * (0.7 + Math.random() * 0.6);
   }
 
   fire(b, gap) {

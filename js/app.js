@@ -19,10 +19,12 @@
   // ---------- Écrans ----------
   function show(id) {
     $$('.screen').forEach(s => s.classList.toggle('active', s.id === id));
+    // Le fond (potentiellement explicite) n'apparaît jamais avant la confirmation de l'âge
+    $('#bg-layer').classList.toggle('hidden', id === 'age-gate' || !bg.has);
   }
 
   // ---------- Paramètres persistants ----------
-  const SETTINGS = ['power', 'pulse', 'mix', 'minutes', 'sens', 'gap', 'band', 'finale', 'phone-vibe', 'click-sound'];
+  const SETTINGS = ['power', 'pulse', 'mix', 'minutes', 'sens', 'gap', 'band', 'finale', 'phone-vibe', 'click-sound', 'bgop', 'level', 'talk'];
   function loadSettings() {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('goonfap:settings') || '{}'); } catch (e) {}
@@ -44,13 +46,15 @@
       pulse: +$('#pulse').value,
       mix: +$('#mix').value,
       click: $('#click-sound').checked,
+      level: $('#level').value,
+      talk: +$('#talk').value,
     };
   }
 
   // Affichage des valeurs des sliders
   const fmt = {
     power: v => Math.round(v * 100) + '%', pulse: v => v + ' ms', mix: v => v < 0.35 ? 'grave' : v > 0.65 ? 'aigu' : 'équilibré',
-    minutes: v => v + ' min', sens: v => (+v).toFixed(1), gap: v => v + ' ms',
+    minutes: v => v + ' min', sens: v => (+v).toFixed(1), gap: v => v + ' ms', bgop: v => Math.round(v * 100) + '%',
   };
   Object.keys(fmt).forEach(id => {
     const el = document.getElementById(id), out = document.getElementById('o-' + id);
@@ -59,7 +63,7 @@
     el.addEventListener('change', saveSettings);
     state['upd_' + id] = upd;
   });
-  ['band', 'finale', 'phone-vibe', 'click-sound'].forEach(id => document.getElementById(id).addEventListener('change', saveSettings));
+  ['band', 'finale', 'phone-vibe', 'click-sound', 'level', 'talk'].forEach(id => document.getElementById(id).addEventListener('change', saveSettings));
   $('#phone-vibe').addEventListener('change', e => Pad.setPhoneFallback(e.target.checked));
 
   // ---------- Porte 18+ ----------
@@ -120,10 +124,18 @@
     if (!f) return;
     setVideo(f);
   });
+  $('#video-url-go').addEventListener('click', () => {
+    const u = $('#video-url').value.trim();
+    if (!/^https?:[/][/]/i.test(u)) { toast('Colle un lien qui commence par http(s)://'); return; }
+    setVideo({ name: u, size: 0, url: u });
+  });
   $('#clear-video').addEventListener('click', () => setVideo(null));
+  // f = File local, ou { name, size: 0, url } pour un lien
   function setVideo(f) {
-    if (state.videoUrl) URL.revokeObjectURL(state.videoUrl);
-    state.videoFile = f; state.videoUrl = f ? URL.createObjectURL(f) : null;
+    if (state.videoUrl && state.videoUrl.startsWith('blob:')) URL.revokeObjectURL(state.videoUrl);
+    state.videoFile = f; state.videoUrl = f ? (f.url || URL.createObjectURL(f)) : null;
+    $('#video').removeAttribute('src');
+    $('#video-url').value = f && f.url ? f.url : '';
     state.autoMap = null;
     $('#analyze-status').textContent = '';
     $('#video-name').textContent = f ? `🎬 ${f.name}` : 'Choisir une vidéo…';
@@ -147,7 +159,14 @@
     if (!state.videoFile) { st.textContent = 'Charge d\'abord une vidéo 😉'; throw new Error('no video'); }
     $('#analyze').disabled = true;
     try {
-      state.autoMap = await Beatmap.analyze(state.videoFile, {
+      let src = state.videoFile;
+      if (src.url) {
+        st.textContent = 'Téléchargement de la vidéo pour l\'analyser…';
+        const res = await fetch(src.url).catch(() => { throw new Error('le site bloque le téléchargement — télécharge la vidéo et choisis le fichier'); });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        src = new File([await res.blob()], src.name);
+      }
+      state.autoMap = await Beatmap.analyze(src, {
         sensitivity: +$('#sens').value, band: $('#band').value, minGap: +$('#gap').value,
       }, msg => { st.textContent = msg; });
       const n = state.autoMap.beats.length;
@@ -223,7 +242,10 @@
     $('#pause-overlay').classList.add('hidden');
     $('#hud-phase').textContent = record ? '⏺ Enregistrement' : '';
     $('#hud-power').textContent = '100%';
+    $('#rec-zone').classList.toggle('hidden', !record);
+    $('#game-controls .edge').classList.toggle('hidden', record);
     show('game');
+    wake();
 
     const s = new Session(map, { ...opts(), record }, video, {
       onMessage: message,
@@ -233,7 +255,7 @@
       onEnd: (stats, taps) => onEnd(stats, taps, record),
     });
     state.session = s;
-    if (record) message('Tape le rythme !<small>✕ / Espace = normal · □ / B = fort · ○ / Échap pour terminer</small>', 4000);
+    if (record) message('Tape le rythme !<small>Espace / clic gauche = normal · B / clic droit = fort · Échap pour terminer</small>', 4000);
     s.start();
     // Plein écran (si autorisé)
     if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
@@ -309,29 +331,36 @@
   }
 
   // ---------- Entrées ----------
-  Pad.onPress(btn => {
-    const s = state.session, B = Pad.BTN;
-    if (!s) {
-      // Navigation simple hors jeu
-      if (btn === B.CROSS && $('#setup').classList.contains('active') && document.activeElement === document.body) $('#start').click();
-      return;
+  // La manette sert uniquement de vibro : ses boutons ne déclenchent rien
+  // (on la frotte contre soi, les appuis seraient accidentels).
+
+  // ---------- Boutons à l'écran ----------
+  $$('#game-controls .gc').forEach(btn => btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const s = state.session;
+    if (!s) return;
+    switch (btn.dataset.act) {
+      case 'pause': togglePause(); break;
+      case 'quit': quit(); break;
+      case 'up': s.adjust(+0.1); break;
+      case 'down': s.adjust(-0.1); break;
+      case 'edge': s.edge(); break;
+      case 'track': s.showHighway = !s.showHighway; break;
     }
-    if (s.opts.record) {
-      if (btn === B.CROSS) s.tap(0.75);
-      else if (btn === B.SQUARE) s.tap(1);
-      else if (btn === B.CIRCLE) quit();
-      else if (btn === B.OPTIONS) togglePause();
-      return;
-    }
-    switch (btn) {
-      case B.OPTIONS: togglePause(); break;
-      case B.CIRCLE: quit(); break;
-      case B.CROSS: s.edge(); break;
-      case B.TRIANGLE: s.showHighway = !s.showHighway; break;
-      case B.R1: case B.R2: s.adjust(+0.1); break;
-      case B.L1: case B.L2: s.adjust(-0.1); break;
-    }
-  });
+  }));
+  const rec = $('#rec-zone');
+  rec.addEventListener('mousedown', e => { e.preventDefault(); if (state.session) state.session.tap(e.button === 2 ? 1 : 0.75); });
+  rec.addEventListener('touchstart', e => { e.preventDefault(); if (state.session) state.session.tap(0.75); }, { passive: false });
+  rec.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Masque boutons et curseur quand la souris ne bouge plus
+  let idleTimer = null;
+  function wake() {
+    $('#game').classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (state.session && !state.session.paused) $('#game').classList.add('idle'); }, 2500);
+  }
+  ['mousemove', 'touchstart', 'keydown'].forEach(ev => document.addEventListener(ev, wake, { passive: true }));
 
   document.addEventListener('keydown', e => {
     const s = state.session;
@@ -355,6 +384,73 @@
     requestAnimationFrame(loop);
   }
 
+  // ---------- Fond personnalisé (GIF / image / vidéo) ----------
+  // Fichier stocké dans IndexedDB (trop gros pour localStorage), lien stocké dans localStorage.
+  const bg = { has: false, objUrl: null };
+  const isVidUrl = u => /[.](mp4|webm)([?#]|$)/i.test(u);
+  const idb = () => new Promise((res, rej) => {
+    const r = indexedDB.open('goonfap', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  async function idbSet(key, val) {
+    const db = await idb();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('kv', 'readwrite');
+      if (val === null) tx.objectStore('kv').delete(key); else tx.objectStore('kv').put(val, key);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+  }
+  async function idbGet(key) {
+    const db = await idb();
+    return new Promise((res, rej) => {
+      const r = db.transaction('kv').objectStore('kv').get(key);
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
+  function applyBg(src, isVideo, name) {
+    const img = $('#bg-img'), vid = $('#bg-vid');
+    if (bg.objUrl && bg.objUrl !== src) { URL.revokeObjectURL(bg.objUrl); bg.objUrl = null; }
+    img.removeAttribute('src'); vid.removeAttribute('src');
+    bg.has = !!src;
+    if (src) {
+      if (isVideo) { vid.src = src; vid.play().catch(() => {}); } else img.src = src;
+      if (src.startsWith('blob:')) bg.objUrl = src;
+    }
+    $('#bg-name').textContent = src ? `🔥 ${name}` : 'Choisir un GIF de fond…';
+    $('#bg-clear').classList.toggle('hidden', !src);
+    const active = $$('.screen').find(s => s.classList.contains('active'));
+    $('#bg-layer').classList.toggle('hidden', !bg.has || (active && active.id === 'age-gate'));
+  }
+  $('#bg-file').addEventListener('change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    applyBg(URL.createObjectURL(f), f.type.startsWith('video/'), f.name);
+    e.target.value = '';
+    try { localStorage.setItem('goonfap:bgurl', ''); await idbSet('bg', f); } catch (err) {}
+  });
+  $('#bg-url-go').addEventListener('click', async () => {
+    const u = $('#bg-url').value.trim();
+    if (!/^https?:[/][/]/i.test(u)) { toast('Colle un lien qui commence par http(s)://'); return; }
+    applyBg(u, isVidUrl(u), u.split('/').pop().slice(0, 40));
+    try { localStorage.setItem('goonfap:bgurl', u); await idbSet('bg', null); } catch (err) {}
+  });
+  $('#bg-clear').addEventListener('click', async () => {
+    applyBg(null);
+    $('#bg-url').value = '';
+    try { localStorage.setItem('goonfap:bgurl', ''); await idbSet('bg', null); } catch (err) {}
+  });
+  $('#bgop').addEventListener('input', e => document.documentElement.style.setProperty('--bgop', e.target.value));
+  async function restoreBg() {
+    document.documentElement.style.setProperty('--bgop', $('#bgop').value);
+    try {
+      const u = localStorage.getItem('goonfap:bgurl');
+      if (u) { $('#bg-url').value = u; applyBg(u, isVidUrl(u), u.split('/').pop().slice(0, 40)); return; }
+      const f = await idbGet('bg');
+      if (f) applyBg(URL.createObjectURL(f), (f.type || '').startsWith('video/'), f.name || 'fond');
+    } catch (err) {}
+  }
+
   // ---------- Init ----------
   loadSettings();
   Object.keys(fmt).forEach(id => state['upd_' + id]());
@@ -363,5 +459,6 @@
   let adult = false;
   try { adult = localStorage.getItem('goonfap:adult') === '1'; } catch (e) {}
   show(adult ? 'setup' : 'age-gate');
+  restoreBg();
   requestAnimationFrame(loop);
 })();
