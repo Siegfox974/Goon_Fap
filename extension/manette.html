@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>GoonFap — Manette</title><link rel="stylesheet" href="popup.css">
+<style>
+  body { width: auto; max-width: 560px; margin: 40px auto; font-size: 15px; }
+  .main { margin: 10px 0; }
+  #log { min-height: 1.4em; color: #ff86c2; font-weight: 700; }
+  li { margin: 6px 0; }
+</style></head>
+<body>
+  <h1>Goon<b>Fap</b> — Manette 🎮</h1>
+  <p>GoonFap pilote ta DualShock 4 (ou DualSense) <b>directement</b>, en USB ou en Bluetooth. Ça marche sur tous les sites, sans avoir à appuyer sur un bouton.</p>
+  <ol>
+    <li>Branche la manette en <b>USB</b> (le plus fiable) ou connecte-la en Bluetooth à Windows.</li>
+    <li>Clique sur le bouton ci-dessous, choisis <b>Wireless Controller</b> / <b>DualSense</b> dans la liste, puis <b>Connexion</b>.</li>
+    <li>La manette vibre et sa barre lumineuse devient rose 💗 : c'est bon, pour toujours.</li>
+  </ol>
+  <button id="connect" class="main">🔗 Connecter la manette</button>
+  <button id="test" class="main stop">💓 Tester les vibrations</button>
+  <p id="log"></p>
+  <p class="small">Si DS4Windows, Steam (« configuration PlayStation ») ou un autre logiciel utilise déjà la manette, ferme-le : il peut bloquer l'accès.<br>
+  Tu peux fermer cet onglet une fois connecté.</p>
+  <script src="hid.js"></script>
+  <script src="manette.js"></script>
+</body>
+</html>

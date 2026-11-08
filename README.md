@@ -42,11 +42,16 @@ Par défaut, la source est sur **Auto** : le funscript s'il y en a un, sinon la 
 
 Clique sur **🩺** dans le panneau : un rapport technique est copié dans le presse-papiers (vidéo trouvée, plein écran, manette, funscript, sons). Colle-le à la personne qui t'aide.
 
-### La manette ne vibre pas ?
+### Connecter la manette (une seule fois)
 
-1. Dans le popup, clique sur **🎮 Tester la manette** et appuie sur un bouton de la manette. Elle doit vibrer à fond.
-2. Si elle n'est pas vue : branche-la **en USB**, c'est le plus fiable.
-3. Sur la page de la vidéo, **clique une fois dans la page puis appuie sur un bouton de la manette**. Chrome ne montre la manette à une page qu'après ça. La ligne 🎮 du panneau doit afficher « Manette prête ».
+GoonFap pilote la DualShock 4 (ou DualSense) **directement**, en USB ou en Bluetooth : ça marche sur tous les sites, sans appuyer sur un bouton.
+
+1. Popup GoonFap → **🔗 Connecter la manette** (un onglet s'ouvre).
+2. Clique sur **Connecter la manette**, choisis *Wireless Controller* / *DualSense* dans la liste, puis **Connexion**.
+3. Elle vibre et sa barre lumineuse devient rose 💗. C'est fait pour de bon.
+
+Si la connexion échoue, ferme **DS4Windows** ou **Steam** (qui peuvent bloquer la manette) et réessaie, de préférence en USB.
+Dans le panneau, la ligne 🎮 affiche « pilotée en direct » quand tout va bien.
 
 ### Utiliser
 

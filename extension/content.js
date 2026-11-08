@@ -28,9 +28,11 @@
     catch (e) { return null; }
   }
   let mainPad = null; // manette vue depuis la page (second chemin)
+  let hid = null;     // manette pilotée en direct (USB/Bluetooth) par l'extension : chemin principal
   function rumble(ms, strong, weak = strong) {
     const p = pad();
     strong = Math.max(0, Math.min(1, strong)); weak = Math.max(0, Math.min(1, weak));
+    if (hid) { send({ type: 'rumble', ms: Math.round(ms), s: strong, w: weak }); return true; }
     if (!(p && (p.vibrationActuator || p.hapticActuators)) && mainPad && mainPad.vib) {
       window.postMessage({ __gfRumble: { ms: Math.round(ms), s: strong, w: weak } }, '*');
       return true;
@@ -43,6 +45,7 @@
     return false;
   }
   function stopRumble() {
+    if (hid) send({ type: 'rumble-stop' });
     window.postMessage({ __gfRumble: { stop: true } }, '*');
     const p = pad();
     if (p && p.vibrationActuator) (p.vibrationActuator.reset ? p.vibrationActuator.reset() : p.vibrationActuator.playEffect('dual-rumble', { duration: 10, strongMagnitude: 0, weakMagnitude: 0 })).catch(() => {});
@@ -421,7 +424,7 @@
       goonfap: chrome.runtime.getManifest().version, site: location.hostname, browser: navigator.userAgent.replace(/.*(Chrome|Edg)\/(\d+).*/, '$1 $2'),
       video: v ? { size: [Math.round(v.getBoundingClientRect().width), Math.round(v.getBoundingClientRect().height)], inShadowOrIframe: !document.contains(v), t: +v.currentTime.toFixed(2), duration: +(v.duration || 0).toFixed(1), paused: v.paused, rvfc: !!v.requestVideoFrameCallback, clock: vclock.ok, parents: (() => { const a = []; for (let q = v.parentElement; q && a.length < 4; q = q.parentElement) a.push(desc(q)); return a; })() } : null,
       fullscreen: desc(fe), hostIn: desc(host.parentElement), popover: usePopover ? host.matches(':popover-open') : 'non', screen: [innerWidth, innerHeight],
-      pad: p ? { id: p.id, vib: !!p.vibrationActuator } : null, padPage: mainPad,
+      hid, pad: p ? { id: p.id, vib: !!p.vibrationActuator } : null, padPage: mainPad,
       source: S.source, used: src(), fOffset: S.fOffset, fMode: S.fMode, vOffset: S.vOffset, lane: !!S.lane, vision: vis.ok,
       funscript: fsData ? { from: fsData.from, actions: fsData.acts.length, lows: fsData.lows.length, highs: fsData.highs.length, first: fsData.acts[0] && fsData.acts[0].at, last: fsData.acts[fsData.acts.length - 1].at } : null,
       beats: st.beats, bpm: Math.round(currentBpm()), sounds, beatSfx: S.beatSfx, beatKind: S.beatKind, moans: S.moans,
@@ -627,7 +630,8 @@
     const p0 = pad();
     const p = p0 || (mainPad && mainPad.id ? mainPad : null);
     const canVibe = p0 ? (p0.vibrationActuator || (p0.hapticActuators && p0.hapticActuators[0])) : (p && p.vib);
-    $('.pad').textContent = !p ? '🎮 Clique sur la page puis appuie sur un bouton de la manette pour la connecter'
+    if (hid) $('.pad').textContent = `🎮 ${hid.name} pilotée en direct (${hid.bt ? 'Bluetooth' : 'USB'}) 💓`;
+    else $('.pad').textContent = !p ? '🎮 Manette non connectée : popup GoonFap → 🔗 Connecter la manette'
       : canVibe ? '🎮 Manette prête — vibrations à fond 💓' : '🎮 Manette sans vibration dans ce navigateur (utilise Chrome/Edge)';
     let sync;
     const mode = src(), visual = mode === 'visual', fsMode = mode === 'funscript';
@@ -950,8 +954,10 @@
         case 'picked': onPicked(m.color); break;
         case 'level': level = m.level; break;
         case 'sounds': sounds = m.sounds; break;
+        case 'hid': hid = m.hid; break;
         case 'hello':
           if (m.sounds) sounds = m.sounds;
+          hid = m.hid || hid;
           sendSettings(); laneSent = ''; updateLane();
           chrome.storage.local.get('soundIndex').then(r => { if (r.soundIndex) send({ type: 'sound-index', files: r.soundIndex }); });
           break;

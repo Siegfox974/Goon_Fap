@@ -14,8 +14,15 @@ chrome.runtime.onConnect.addListener(port => {
   ports.add(port);
   port.onDisconnect.addListener(() => ports.delete(port));
   port.onMessage.addListener(onPortMessage);
-  port.postMessage({ type: 'hello', running: !!ctx, sounds: Sounds.summary() });
+  port.postMessage({ type: 'hello', running: !!ctx, sounds: Sounds.summary(), hid: GFHID.info() });
+  GFHID.auto().then(() => port.postMessage({ type: 'hid', hid: GFHID.info() })).catch(() => {});
 });
+
+// Manette pilotée en direct : on prévient l'overlay quand elle apparaît / disparaît
+if (navigator.hid) {
+  navigator.hid.addEventListener('connect', () => setTimeout(() => broadcast({ type: 'hid', hid: GFHID.info() }), 300));
+  navigator.hid.addEventListener('disconnect', () => setTimeout(() => broadcast({ type: 'hid', hid: GFHID.info() }), 100));
+}
 
 function broadcast(msg) { ports.forEach(p => { try { p.postMessage(msg); } catch (e) { ports.delete(p); } }); }
 
@@ -30,6 +37,8 @@ function onPortMessage(m) {
     case 'mood': Sounds.mood(m.kind); break;
     case 'beat': Sounds.beat(); break;
     case 'clip': Sounds.oneShot(m.kind); break;
+    case 'rumble': GFHID.rumble(m.ms, m.s, m.w); break;
+    case 'rumble-stop': GFHID.stop(); break;
     case 'sound-index': Sounds.setIndex(m.files); break;
     case 'test-sounds': Sounds.test().then(ok => broadcast({ type: 'snd-test', ok })); break;
   }

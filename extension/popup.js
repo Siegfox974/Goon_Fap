@@ -135,22 +135,15 @@ $('#go').addEventListener('click', async () => {
   refresh();
 });
 
-// Test de la manette, sans vidéo
-$('#padtest').addEventListener('click', async () => {
-  const info = $('#padinfo');
-  const get = () => Array.from(navigator.getGamepads ? navigator.getGamepads() : []).find(Boolean);
-  let p = get();
-  if (!p) {
-    info.textContent = 'Appuie sur un bouton de la manette…';
-    for (let i = 0; i < 50 && !p; i++) { await new Promise(r => setTimeout(r, 100)); p = get(); }
-  }
-  if (!p) { info.textContent = '❌ Aucune manette vue. Branche-la (USB conseillé) et appuie sur un bouton.'; return; }
-  const a = p.vibrationActuator;
-  if (!(a && a.playEffect)) { info.textContent = `⚠ ${p.id.slice(0, 40)} : vue, mais ce navigateur ne sait pas la faire vibrer.`; return; }
+// Manette pilotée en direct (WebHID) : la connexion se fait dans un onglet (la fenêtre de choix y est fiable)
+$('#padconnect').addEventListener('click', () => chrome.tabs.create({ url: 'manette.html' }));
+(async () => {
   try {
-    await a.playEffect('dual-rumble', { startDelay: 0, duration: 700, strongMagnitude: 1, weakMagnitude: 1 });
-    info.textContent = '✅ Ça doit vibrer à fond ! Si rien : essaie en USB.';
-  } catch (e) { info.textContent = '❌ Vibration refusée : ' + e.message; }
-});
+    const list = navigator.hid ? await navigator.hid.getDevices() : [];
+    const d = list.find(x => x.vendorId === 0x054c);
+    $('#padinfo').textContent = d ? `✅ ${d.productName || 'Manette Sony'} autorisée — GoonFap la pilote en direct.` : 'Manette pas encore connectée à GoonFap.';
+    if (d) $('#padconnect').textContent = '🎮 Manette : tester / reconnecter';
+  } catch (e) {}
+})();
 
 init();

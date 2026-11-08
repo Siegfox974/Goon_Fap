@@ -203,18 +203,20 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     if (/material|ambien|music|musique|room|bed ?creak|furniture|body noise/.test(s)) return null;
     // voix masculines : jamais (on ne veut que des voix de femme)
     if (/\[m\]|\(m\)|[-_ ]m[-_ ]?voice|male|\bmasc|lewddmon|\bguy\b|\bhomme/.test(s) && !/female/.test(s)) return null;
-    const voice = /moan|gemi|gémi|breath|pant|whimper|voice|vocal|\[f\]|female|\bva\b|_va_/.test(s);
-    // orgasme : seulement des voix de femme qui jouissent (pas les bruitages de sperme)
-    if (/climax|orgasm|cumming|jouis/.test(s) && voice) return 'jouis';
-    if (/\bcum|ejac|creampie|squirt|spurt|splat/.test(s)) return null;
-    // bruit de branlette (main mouillée)
-    if (/fap|stroke|handjob|hand ?job|jerk|lotion|squish|squelch|wet|in ?(&|and|-|_)? ?out/.test(s)) return 'fap';
-    if (/plap|clap|slap|spank|thrust|pound/.test(s)) return 'beat';
+    // Tout ce qui vient d'une VOIX (pack de voix, gémissements…) n'est JAMAIS un bruitage de beat :
+    // sinon une actrice qui crie se retrouve jouée à chaque coup.
+    const voice = /moan|gemi|gémi|breath|pant|whimper|groan|scream|voice|vocal|\[f\]|female|\bva\b|_va_|moanpack|voicepack|\(va\)/.test(s);
     if (voice) {
+      if (/climax|orgasm|cumming|jouis/.test(s)) return 'jouis';
+      if (/oral|mouth|suck|slurp|blow|gag|lick|kiss/.test(s)) return null; // voix + bouche : pas pour nous
       if (/\bhigh|intense|loud|hard|heavy|scream|fort/.test(s)) return 'rapide';
       if (/\blow|soft|light|gentle|quiet|whisper|doux/.test(s)) return 'lent';
       return 'moyen';
     }
+    // bruitages (sans voix)
+    if (/\bcum|ejac|creampie|squirt|spurt|splat/.test(s)) return null;
+    if (/fap|stroke|handjob|hand ?job|jerk|lotion|squish|squelch|wet|in ?(&|and|-|_)? ?out/.test(s)) return 'fap';
+    if (/plap|clap|slap|spank|thrust|pound/.test(s)) return 'beat';
     if (/oral|mouth|suck|slurp|blow|gag|lick|kiss|spit|drool/.test(s)) return 'oral';
     return null;
   }
