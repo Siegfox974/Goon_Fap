@@ -63,7 +63,7 @@ $('#age-ok').addEventListener('click', async () => {
 });
 
 const listDir = GF.listDir;
-const LABELS = { lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes',
+const LABELS = { fap: 'fap', lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes féminins',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
 async function counts() {
   const g = await listDir('gifs');
@@ -101,6 +101,24 @@ $('#go').addEventListener('click', async () => {
   st.textContent = r && r.ok ? '💓 C\'est parti ! Lance la vidéo.' : '❌ ' + (r ? r.error : 'erreur inconnue');
   if (r && r.ok) setTimeout(() => window.close(), 900);
   refresh();
+});
+
+// Test de la manette, sans vidéo
+$('#padtest').addEventListener('click', async () => {
+  const info = $('#padinfo');
+  const get = () => Array.from(navigator.getGamepads ? navigator.getGamepads() : []).find(Boolean);
+  let p = get();
+  if (!p) {
+    info.textContent = 'Appuie sur un bouton de la manette…';
+    for (let i = 0; i < 50 && !p; i++) { await new Promise(r => setTimeout(r, 100)); p = get(); }
+  }
+  if (!p) { info.textContent = '❌ Aucune manette vue. Branche-la (USB conseillé) et appuie sur un bouton.'; return; }
+  const a = p.vibrationActuator;
+  if (!(a && a.playEffect)) { info.textContent = `⚠ ${p.id.slice(0, 40)} : vue, mais ce navigateur ne sait pas la faire vibrer.`; return; }
+  try {
+    await a.playEffect('dual-rumble', { startDelay: 0, duration: 700, strongMagnitude: 1, weakMagnitude: 1 });
+    info.textContent = '✅ Ça doit vibrer à fond ! Si rien : essaie en USB.';
+  } catch (e) { info.textContent = '❌ Vibration refusée : ' + e.message; }
 });
 
 init();

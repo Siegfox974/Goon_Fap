@@ -2,7 +2,7 @@
 /* eslint-disable no-var */
 var GF = globalThis.GF || (globalThis.GF = (() => {
   const DEFAULTS = {
-    _v: 3,
+    _v: 4,
     power: 1,          // 100 % = le max de la manette
     pulse: 140,        // ms par vibration
     source: 'auto',    // 'auto' | 'funscript' | 'visual' (barre rythmo à l'image) | 'audio' (le son)
@@ -24,7 +24,7 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     voiceRate: 0.92,
     voicePitch: 1.05,
     finale: 'cum',     // fin de vidéo : 'cum' | 'ruin' | 'denial' | 'off'
-    beatKind: 'beat',  // bruitage sur chaque beat : 'beat' (claquements) | 'oral' | 'mix'
+    beatKind: 'fap',   // bruitage sur chaque beat : 'fap' (branlette) | 'beat' (claquements) | 'oral' | 'mix'
     clips: true,       // jouer les sons du dossier sons/ quand il y en a
     moans: true,       // ambiance : gémissements en continu selon le tempo
     clipVol: 0.9,
@@ -191,22 +191,29 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
    * un pack entier (ex. OpenNSFW) tel quel dans sons/.
    * Renvoie : debut|lent|moyen|rapide|taquin|stop|reprise|bord|jouis|beat|oral|null
    */
-  const KINDS = ['debut', 'lent', 'moyen', 'rapide', 'taquin', 'stop', 'reprise', 'bord', 'jouis', 'beat', 'oral'];
+  const KINDS = ['debut', 'lent', 'moyen', 'rapide', 'taquin', 'stop', 'reprise', 'bord', 'jouis', 'fap', 'beat', 'oral'];
   function classifySound(path) {
     const parts = path.toLowerCase().split('/');
     // 1) rangé à la main dans un de nos dossiers ?
     for (const p of parts.slice(0, -1)) if (KINDS.includes(p)) return p;
     const s = parts.join('/');
     // 2) sinon, d'après les mots du chemin
-    if (/material|ambien|music|musique|room|bed ?creak|furniture/.test(s)) return null;
-    if (/cum|climax|orgasm|ejac|squirt|creampie|jouis/.test(s)) return 'jouis';
-    if (/plap|clap|slap|spank|thrust|pound|in ?(&|and|-|_)? ?out|squelch|fap|stroke/.test(s)) return 'beat';
-    if (/moan|gemi|gémi|breath|pant|whimper|groan|voice|vocal|va\b/.test(s)) {
+    if (/material|ambien|music|musique|room|bed ?creak|furniture|body noise/.test(s)) return null;
+    // voix masculines : jamais (on ne veut que des voix de femme)
+    if (/\[m\]|\(m\)|[-_ ]m[-_ ]?voice|male|\bmasc|lewddmon|\bguy\b|\bhomme/.test(s) && !/female/.test(s)) return null;
+    const voice = /moan|gemi|gémi|breath|pant|whimper|voice|vocal|\[f\]|female|\bva\b|_va_/.test(s);
+    // orgasme : seulement des voix de femme qui jouissent (pas les bruitages de sperme)
+    if (/climax|orgasm|cumming|jouis/.test(s) && voice) return 'jouis';
+    if (/\bcum|ejac|creampie|squirt|spurt|splat/.test(s)) return null;
+    // bruit de branlette (main mouillée)
+    if (/fap|stroke|handjob|hand ?job|jerk|lotion|squish|squelch|wet|in ?(&|and|-|_)? ?out/.test(s)) return 'fap';
+    if (/plap|clap|slap|spank|thrust|pound/.test(s)) return 'beat';
+    if (voice) {
       if (/\bhigh|intense|loud|hard|heavy|scream|fort/.test(s)) return 'rapide';
       if (/\blow|soft|light|gentle|quiet|whisper|doux/.test(s)) return 'lent';
       return 'moyen';
     }
-    if (/oral|mouth|suck|slurp|blow|gag|lick|kiss|wet|spit|drool/.test(s)) return 'oral';
+    if (/oral|mouth|suck|slurp|blow|gag|lick|kiss|spit|drool/.test(s)) return 'oral';
     return null;
   }
 
@@ -244,7 +251,8 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
   /** Met à jour d'anciens réglages enregistrés. */
   function migrate(s) {
     s = Object.assign({}, s || {});
-    if ((s._v || 0) < 3) { s.beatSfx = true; s.source = 'auto'; s._v = 3; }
+    if ((s._v || 0) < 3) { s.beatSfx = true; s.source = 'auto'; }
+    if ((s._v || 0) < 4) { s.beatKind = 'fap'; s._v = 4; }
     return s;
   }
 

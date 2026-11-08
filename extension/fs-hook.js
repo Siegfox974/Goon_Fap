@@ -3,6 +3,22 @@
  * Un funscript = JSON { actions: [{ at: ms, pos: 0..100 }, …] }. Rien n'est envoyé hors de ton navigateur. */
 (() => {
   if (window.__gfHook) { window.__gfHook.scan(); return; }
+
+  // --- Manette, côté page : second chemin pour les vibrations (au cas où GoonFap ne la voit pas de son côté) ---
+  const gp = () => { try { return Array.from(navigator.getGamepads ? navigator.getGamepads() : []).find(Boolean) || null; } catch (e) { return null; } };
+  window.addEventListener('message', e => {
+    if (e.source !== window || !e.data || !e.data.__gfRumble) return;
+    const r = e.data.__gfRumble, p = gp();
+    if (!p) return;
+    const a = p.vibrationActuator;
+    if (r.stop) { if (a && a.reset) a.reset().catch(() => {}); return; }
+    if (a && a.playEffect) a.playEffect('dual-rumble', { startDelay: 0, duration: r.ms, strongMagnitude: r.s, weakMagnitude: r.w }).catch(() => {});
+    else if (p.hapticActuators && p.hapticActuators[0]) { try { p.hapticActuators[0].pulse(Math.max(r.s, r.w), r.ms); } catch (er) {} }
+  });
+  setInterval(() => {
+    const p = gp();
+    window.postMessage({ __gfPad: p ? { id: p.id, vib: !!((p.vibrationActuator && p.vibrationActuator.playEffect) || (p.hapticActuators && p.hapticActuators[0])) } : { none: true } }, '*');
+  }, 1000);
   const seen = new Set();
 
   function looksLikeScript(o) {

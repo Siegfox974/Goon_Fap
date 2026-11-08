@@ -27,9 +27,14 @@
     try { return Array.from(navigator.getGamepads ? navigator.getGamepads() : []).find(Boolean) || null; }
     catch (e) { return null; }
   }
+  let mainPad = null; // manette vue depuis la page (second chemin)
   function rumble(ms, strong, weak = strong) {
     const p = pad();
     strong = Math.max(0, Math.min(1, strong)); weak = Math.max(0, Math.min(1, weak));
+    if (!(p && (p.vibrationActuator || p.hapticActuators)) && mainPad && mainPad.vib) {
+      window.postMessage({ __gfRumble: { ms: Math.round(ms), s: strong, w: weak } }, '*');
+      return true;
+    }
     if (p && p.vibrationActuator && p.vibrationActuator.playEffect) {
       p.vibrationActuator.playEffect('dual-rumble', { startDelay: 0, duration: Math.round(ms), strongMagnitude: strong, weakMagnitude: weak }).catch(() => {});
       return true;
@@ -38,6 +43,7 @@
     return false;
   }
   function stopRumble() {
+    window.postMessage({ __gfRumble: { stop: true } }, '*');
     const p = pad();
     if (p && p.vibrationActuator) (p.vibrationActuator.reset ? p.vibrationActuator.reset() : p.vibrationActuator.playEffect('dual-rumble', { duration: 10, strongMagnitude: 0, weakMagnitude: 0 })).catch(() => {});
   }
@@ -45,7 +51,24 @@
   // ---------- Overlay (Shadow DOM, isolé du CSS du site) ----------
   const host = document.createElement('div');
   host.id = 'goonfap-host';
-  host.style.cssText = 'position:fixed;inset:0;z-index:2147483647;pointer-events:none;';
+  host.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:transparent;overflow:visible;z-index:2147483647;pointer-events:none;color-scheme:normal;';
+  // « Couche du dessus » du navigateur : GoonFap reste visible par-dessus TOUT, même le plein écran du site
+  const usePopover = typeof host.showPopover === 'function';
+  if (usePopover) host.setAttribute('popover', 'manual');
+  function raise() {
+    // En plein écran, Chrome rend tout ce qui est hors de l'élément plein écran non cliquable :
+    // GoonFap se place donc DANS le lecteur (sauf si c'est la balise vidéo elle-même).
+    const fe = document.fullscreenElement;
+    const parent = fe && fe.tagName !== 'VIDEO' ? fe : document.documentElement;
+    if (host.parentNode !== parent) { try { if (usePopover && host.matches(':popover-open')) host.hidePopover(); } catch (e) {} parent.appendChild(host); }
+    if (usePopover) {
+      try { if (host.matches(':popover-open')) host.hidePopover(); host.showPopover(); } catch (e) {}
+    } else {
+      const fe = document.fullscreenElement;
+      const target = fe && fe.tagName !== 'VIDEO' ? fe : document.documentElement;
+      if (host.parentNode !== target) target.appendChild(host);
+    }
+  }
   const root = host.attachShadow({ mode: 'open' });
   root.innerHTML = `
 <style>
@@ -63,7 +86,7 @@
   .panel { position: fixed; top: 14px; right: 14px; pointer-events: auto; color: #f6e9f2; width: 336px;
     background: rgba(26,8,30,.88); border: 1px solid rgba(255,92,170,.4); border-radius: 16px; padding: 12px;
     box-shadow: 0 8px 30px rgba(0,0,0,.5); backdrop-filter: blur(6px); font-size: 13px; transition: opacity .4s; }
-  .panel.dim { opacity: .15; } .panel.dim:hover { opacity: 1; }
+  .panel.dim { opacity: .5; } .panel.dim:hover { opacity: 1; }
   .head { display: flex; align-items: center; gap: 8px; }
   .logo { font-weight: 900; font-size: 18px; } .logo b { color: #ff3d9a; text-shadow: 0 0 10px #ff3d9a; }
   .heart { font-size: 20px; transition: transform .08s; display: inline-block; }
@@ -137,7 +160,8 @@
   const panel = $('.panel'), msgEl = $('.msg'), vignette = $('.vignette'), canvas = $('canvas.track'), cx = canvas.getContext('2d');
   const prev = $('canvas.prev'), px = prev.getContext('2d'), gifFrame = $('iframe.gifs');
   gifFrame.src = chrome.runtime.getURL('gifview.html');
-  (document.fullscreenElement && document.fullscreenElement.tagName !== 'VIDEO' ? document.fullscreenElement : document.documentElement).appendChild(host);
+  document.documentElement.appendChild(host);
+  raise();
 
   // ---------- Messages, voix, GIF ----------
   let msgTimer = null;
@@ -192,7 +216,8 @@
     if (now < st.muteUntil) return false;
     // anti-doublon : jamais deux vibrations trop rapprochées
     const recent = st.iv.slice(-3);
-    const minGap = Math.max(35, recent.length >= 2 ? Math.min(...recent) * 0.45 : 35);
+    // plancher fixe (80 ms ≈ 750 BPM) : l'anti-doublon ne peut pas s'emballer sur ses propres vibrations
+    const minGap = Math.max(80, recent.length >= 2 ? median(recent) * 0.45 : 80);
     if (now - st.lastFire < minGap) return false;
     const gap = Math.min(now - st.lastFire, recent.length ? median(recent) : 1000);
     st.lastFire = now;
@@ -264,7 +289,7 @@
     if (src() !== 'visual' || calib) return;
     const now = performance.now();
     const recent = st.iv.slice(-3);
-    const tol = Math.max(18, Math.min(120, (recent.length ? Math.min(...recent) : 300) * 0.45));
+    const tol = Math.max(30, Math.min(120, (recent.length ? median(recent) : 300) * 0.45));
     vis.fired = vis.fired.filter(t => now - t < 1000);
     for (const eta of etas) {
       const at = now + eta - S.vOffset;
@@ -381,7 +406,8 @@
   // Funscripts repérés dans la page par fs-hook.js
   window.addEventListener('message', e => {
     if (e.source !== window || !e.data) return;
-    if (e.data.__gfFunscript) loadFunscript(e.data.__gfFunscript, 'page');
+    if (e.data.__gfPad) mainPad = e.data.__gfPad.none ? null : e.data.__gfPad;
+    else if (e.data.__gfFunscript) loadFunscript(e.data.__gfFunscript, 'page');
     else if (e.data.__gfTry) chrome.runtime.sendMessage({ type: 'gf-fetch', url: e.data.__gfTry }).then(t => { if (t) try { loadFunscript(JSON.parse(t), 'page'); } catch (er) {} }).catch(() => {});
   });
   // Fichier choisi à la main
@@ -503,14 +529,15 @@
     if (!sounds) return '🎧 Sons : …';
     const n = k => sounds[k] || 0;
     const moans = n('lent') + n('moyen') + n('rapide');
-    if (!moans && !n('beat') && !n('oral') && !n('jouis')) return '🎧 Aucun son (dossier sons/ vide)';
-    return `🎧 ${n('beat')} claquements · ${n('oral')} bouche · ${moans} gémissements · ${n('jouis')} orgasmes` + (S.beatSfx ? '' : ' (bruitage par beat coupé)');
+    if (!moans && !n('fap') && !n('beat') && !n('oral') && !n('jouis')) return '🎧 Aucun son (dossier sons/ vide)';
+    return `🎧 ${n('fap')} fap · ${n('beat')} claquements · ${n('oral')} bouche · ${moans} gémissements · ${n('jouis')} orgasmes` + (S.beatSfx ? '' : ' (bruitage par beat coupé)');
   }
   function updatePanel(bpm, silent) {
     $('.bpm').textContent = bpm && silent < silenceLimit() ? `${Math.round(bpm)} BPM` : '— BPM';
-    const p = pad();
-    const canVibe = p && (p.vibrationActuator || (p.hapticActuators && p.hapticActuators[0]));
-    $('.pad').textContent = !p ? '🎮 Appuie sur un bouton de la manette pour la connecter'
+    const p0 = pad();
+    const p = p0 || (mainPad && mainPad.id ? mainPad : null);
+    const canVibe = p0 ? (p0.vibrationActuator || (p0.hapticActuators && p0.hapticActuators[0])) : (p && p.vib);
+    $('.pad').textContent = !p ? '🎮 Clique sur la page puis appuie sur un bouton de la manette pour la connecter'
       : canVibe ? '🎮 Manette prête — vibrations à fond 💓' : '🎮 Manette sans vibration dans ce navigateur (utilise Chrome/Edge)';
     let sync;
     const mode = src(), visual = mode === 'visual', fsMode = mode === 'funscript';
@@ -613,30 +640,43 @@
     const s = Math.min(r.width / vw, r.height / vh), w = vw * s, h = vh * s;
     return { x: r.left + (r.width - w) / 2, y: r.top + (r.height - h) / 2, w, h };
   }
-  // Plein écran GoonFap : la PAGE passe en plein écran (ce que le navigateur accepte toujours) et la vidéo
-  // est plaquée par-dessus tout le reste. Les ancêtres de la vidéo sont neutralisés (transform, filter…)
-  // sinon ils l'enfermeraient dans le cadre du lecteur. Les contrôles natifs de la vidéo sont affichés.
-  let imm = null; // { v, anc:[], hadControls }
+  // Plein écran GoonFap : comme le bouton plein écran du site (le lecteur passe en plein écran).
+  // Si la vidéo ne remplit pas l'écran, on la plaque par-dessus tout le reste.
+  let imm = null; // { v, anc:[], hadControls } quand la vidéo est plaquée
+  function playerWrapper(v) {
+    const vr = v.getBoundingClientRect(), va = Math.max(1, vr.width * vr.height);
+    let best = null;
+    for (let p = v.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement) {
+      const r = p.getBoundingClientRect();
+      if (r.width * r.height > va * 2.2 + 1) break; // trop grand : ce n'est plus le lecteur
+      best = p;
+    }
+    return best;
+  }
   async function toggleImmersive() {
-    if (imm) { if (document.fullscreenElement) await document.exitFullscreen().catch(() => {}); exitImmersive(); return; }
+    if (document.fullscreenElement) { await document.exitFullscreen().catch(() => {}); exitImmersive(); return; }
     const v = mainVideo();
     if (!v) { message('Aucune vidéo trouvée sur cette page 🤔', 2500, { speak: false }); return; }
+    const wrap = playerWrapper(v);
+    try { await (wrap || document.documentElement).requestFullscreen({ navigationUI: 'hide' }); }
+    catch (e) {
+      try { await document.documentElement.requestFullscreen(); }
+      catch (e2) { message('Le navigateur a refusé le plein écran — appuie sur F11 😉', 3500, { speak: false }); return; }
+    }
+    setTimeout(() => {
+      if (!document.fullscreenElement) return;
+      const r = v.getBoundingClientRect();
+      if (r.width < innerWidth * 0.9 && r.height < innerHeight * 0.9) plaque(v); // la vidéo est restée petite
+    }, 500);
+  }
+  function plaque(v) {
+    if (imm) return;
     const anc = [];
     for (let p = v.parentElement; p && p !== document.documentElement; p = p.parentElement) anc.push(p);
     imm = { v, anc, hadControls: v.controls };
     anc.forEach(e => e.classList.add('gf-fs-anc'));
     v.classList.add('gf-immersive-video');
     v.controls = true;
-    const req = document.fullscreenElement ? Promise.resolve() : document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-    req.catch(() => message('Le navigateur a refusé le plein écran — appuie sur F11 😉', 3500, { speak: false }));
-    if (host.parentNode !== document.documentElement) document.documentElement.appendChild(host);
-    panel.classList.add('dim');
-    // vérification : la vidéo couvre-t-elle bien l'écran ?
-    setTimeout(() => {
-      if (!imm) return;
-      const r = v.getBoundingClientRect();
-      if (r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) message('Le site bloque l\'agrandissement de la vidéo 😕<small>Essaie son propre bouton plein écran : GoonFap s\'y glisse aussi</small>', 4500, { speak: false });
-    }, 600);
   }
   function exitImmersive() {
     if (!imm) return;
@@ -644,14 +684,12 @@
     imm.v.classList.remove('gf-immersive-video');
     imm.v.controls = imm.hadControls;
     imm = null;
-    panel.classList.remove('dim');
   }
   const onFs = () => {
     const fe = document.fullscreenElement;
-    if (!fe && imm) exitImmersive();
-    const target = fe && fe.tagName !== 'VIDEO' && !imm ? fe : document.documentElement;
-    if (host.parentNode !== target) target.appendChild(host);
-    if (fe && fe.tagName === 'VIDEO') message('Utilise le bouton ⛶ de GoonFap pour garder les messages en plein écran 😉', 4000, { speak: false });
+    if (!fe) exitImmersive();
+    raise(); // repasse au-dessus du nouvel élément plein écran
+    setTimeout(raise, 150); // Chrome finit parfois de placer l'élément plein écran juste après l'événement
     panel.classList.toggle('dim', !!fe);
   };
   document.addEventListener('fullscreenchange', onFs);
@@ -798,7 +836,7 @@
       switch (m.type) {
         case 'onset': onOnset(m.s, m.at); break;
         case 'vetas': onVEtas(m.etas); break;
-        case 'snd-test': message(m.ok ? '🎧 Tu dois entendre un claquement puis un orgasme' : '🎧 Aucun son trouvé : dézippe ton pack dans extension/sons/ puis recharge l\'extension', 4000, { speak: false }); break;
+        case 'snd-test': message(m.ok ? '🎧 Tu dois entendre un bruit de fap, puis un orgasme' : '🎧 Aucun son trouvé : dézippe ton pack dans extension/sons/ puis recharge l\'extension', 4000, { speak: false }); break;
         case 'vprof': vis.prof = m; drawPreview(); break;
         case 'vision': vis.ok = m.ok; break;
         case 'picked': onPicked(m.color); break;
@@ -830,13 +868,14 @@
     clearPend();
     exitImmersive();
     document.removeEventListener('fullscreenchange', onFs);
+    if (usePopover) try { host.hidePopover(); } catch (e) {}
     window.removeEventListener('keydown', onKey, true);
     if (port) try { port.disconnect(); } catch (e) {}
     host.remove();
     delete window.__goonfap;
   }
 
-  window.__goonfap = { show() { if (!host.isConnected) document.documentElement.appendChild(host); } };
+  window.__goonfap = { show() { raise(); } };
   connect();
   requestAnimationFrame(draw);
   setTimeout(() => {

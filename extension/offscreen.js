@@ -363,14 +363,15 @@ const Sounds = (() => {
     },
     beat() {
       if (!opts.beatSfx) return;
-      let k = opts.beatKind === 'mix' ? (Math.random() < 0.5 ? 'beat' : 'oral') : opts.beatKind;
-      if (!files[k] || !files[k].length) k = files.beat.length ? 'beat' : 'oral';
-      play(k, opts.beatVol, null, 1.2);
+      const fam = ['fap', 'beat', 'oral'].filter(k => files[k].length);
+      if (!fam.length) return;
+      const want = opts.beatKind === 'mix' ? fam[Math.floor(Math.random() * fam.length)] : opts.beatKind;
+      play(fam.includes(want) ? want : fam[0], opts.beatVol, null, 1.2);
     },
     // Test : un claquement puis un orgasme (ou ce qu'on trouve)
     async test() {
       await ready;
-      const order = ['beat', 'oral', 'jouis', 'rapide', 'moyen', 'lent'].filter(k => files[k].length);
+      const order = ['fap', 'beat', 'oral', 'jouis', 'rapide', 'moyen', 'lent'].filter(k => files[k].length);
       if (!order.length || !actx) return false;
       const s = await play(order[0], opts.beatVol || 0.8, null, 1.2);
       if (order[1]) setTimeout(() => play(order.includes('jouis') ? 'jouis' : order[1], opts.clipVol), 700);
