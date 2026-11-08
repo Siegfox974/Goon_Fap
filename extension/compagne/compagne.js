@@ -13,9 +13,10 @@ import * as P from './poses.js';
 const cfg = { nude: 'strip', frame: 'buste', scene: 'auto', view: 'pov' };
 const st = { e: 0, phase: 0, lastBeat: 0, period: 600, mood: 'warm', state: 'play', talkUntil: 0, cumUntil: 0, stage: 0,
   pos: null, posAt: 0, scene: 'danse', sceneSince: 0 };
-let M = null, F = null;                       // mesures du modèle, scène fellation (sexe masculin)
+let M = null, F = null, R = null;            // mesures du modèle, fellation (sexe masculin), chevauche (gode)
 const anims = {};                             // animations .vrma par scène (dossier animations/)
 let mixer = null, action = null, actionScene = null;
+let licenceOk = true; // la licence du modèle autorise-t-elle la nudité / le sexe ?
 let vrm = null, renderer, scene, camera, clock, skin = null, origTex = null, nudeRep = null, wear = [];
 
 const post = m => parent.postMessage(Object.assign({ gf: 'compagne' }, m), '*');
@@ -84,7 +85,8 @@ function stripMore(why) {
 }
 
 // ---------- Animations d'artistes (.vrma, dossier animations/) ----------
-const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbation' : /blow|fella|suck|bj|oral|pipe/i.test(f) ? 'fellation' : /dance|danse|idle|tease|strip/i.test(f) ? 'danse' : null;
+const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbation' : /blow|fella|suck|bj|oral|pipe/i.test(f) ? 'fellation'
+  : /ride|riding|chevauch|dildo|gode|cowgirl/i.test(f) ? 'chevauche' : /twerk/i.test(f) ? 'twerk' : /dance|danse|idle|tease|strip/i.test(f) ? 'danse' : null;
 async function loadAnims(loader) {
   const files = (await GF.listDir('animations')).filter(f => /\.vrma$/i.test(f));
   if (!files.length) return;
@@ -103,19 +105,26 @@ async function loadAnims(loader) {
 // ---------- Choix de la scène ----------
 const naked = () => cfg.nude === 'nue' || st.stage >= wear.length;
 function wantedScene(now) {
+  if (!licenceOk) return 'danse';
   if (cfg.scene !== 'auto') return cfg.scene;
   if (st.state === 'pause' || st.state === 'edge') return st.scene === 'danse' ? 'danse' : st.scene; // elle se fige, la moue aux lèvres
   if (cfg.nude === 'habillee' || !naked()) return 'danse';                                           // d'abord le strip-tease
-  if (st.state === 'final' || st.state === 'cum' || st.mood === 'fast' || st.mood === 'faster') return 'fellation';
-  if (st.mood === 'medium') return 'masturbation';
-  return st.scene === 'danse' ? 'masturbation' : st.scene;
+  if (st.state === 'final' || st.state === 'cum') return 'fellation';
+  // rythme rapide : elle alterne fellation / chevauche ; moyen : masturbation / twerk
+  const fastSet = ['fellation', 'chevauche'], midSet = ['masturbation', 'twerk'];
+  const pickIn = set => set.includes(st.scene) && now - st.sceneSince < 45000 ? st.scene : set[(set.indexOf(st.scene) + 1) % set.length] || set[0];
+  if (st.mood === 'fast' || st.mood === 'faster') return pickIn(fastSet);
+  if (st.mood === 'medium') return pickIn(midSet);
+  return st.scene === 'danse' ? 'twerk' : st.scene;
 }
 function switchScene(sc) {
   if (sc === st.scene) return;
   st.scene = sc; st.sceneSince = performance.now();
   if (sc !== 'danse' && cfg.nude !== 'habillee' && !naked()) { st.stage = wear.length; applyWear(); } // elle se met nue pour ça
   if (sc === 'fellation' && !F) F = P.setupFellation(vrm, M, scene);
+  if (sc === 'chevauche' && !R) R = P.setupRiding(vrm, M, scene);
   if (F) F.group.visible = sc === 'fellation';
+  if (R) R.group.visible = sc === 'chevauche';
   // petit fondu pour masquer le changement de pose
   renderer.domElement.style.transition = 'none'; renderer.domElement.style.opacity = '0';
   requestAnimationFrame(() => { renderer.domElement.style.transition = 'opacity .45s'; renderer.domElement.style.opacity = '1'; });
@@ -155,7 +164,19 @@ async function load() {
   frame();
   applyWear();
   const meta = vrm.meta || {};
-  post({ type: 'ready', ok: true, name: meta.name || meta.title || path.split('/').pop(), author: (meta.authors && meta.authors.join(', ')) || meta.author || '', wear: wear.length, nude: !!(nudeRep && nudeRep.ok) });
+  // Licence inscrite dans le fichier : VRM 0 (sexualUssageName) ou VRM 1 (allowExcessivelySexualUsage)
+  const sexual = meta.metaVersion === '0' ? /allow/i.test(meta.sexualUssageName || '') && !/disallow/i.test(meta.sexualUssageName || '') : meta.allowExcessivelySexualUsage === true;
+  const modif = meta.metaVersion === '0' ? true : meta.modification !== 'prohibited';
+  licenceOk = sexual && modif;
+  if (!licenceOk) { cfg.nude = 'habillee'; st.stage = 0; applyWear(); } // on respecte la licence : elle reste habillée
+  // bilan des poses : les mains atteignent-elles leurs cibles ?
+  const r = P.poseMasturbation(vrm, M, 0.5, 0, 1) || {};
+  P.resetPose(vrm, M); restPose();
+  const rp = (bone) => { const b = B(bone); return b ? +P.wpos(b).y.toFixed(2) : null; };
+  post({ type: 'ready', ok: true, name: meta.name || meta.title || path.split('/').pop(), author: (meta.authors && meta.authors.join(', ')) || meta.author || '',
+    wear: wear.length, nude: !!(nudeRep && nudeRep.ok), licence: { sexual, modif, raw: meta.sexualUssageName || meta.allowExcessivelySexualUsage, vrm: meta.metaVersion },
+    report: { taille: +(M.s * 1.6).toFixed(2), tete: rp('head'), bassin: rp('hips'), pointsPeau: nudeRep && nudeRep.pts ? Object.fromEntries(Object.entries(nudeRep.pts).map(([k, v]) => [k, v ? [+v.u.toFixed(3), +v.v.toFixed(3)] : null])) : null,
+      vetements: clothes(vrm).length, ecartMainSexeCm: r.sexe != null ? Math.round(r.sexe * 100) : null, ecartMainSeinCm: r.sein != null ? Math.round(r.sein * 100) : null } });
   requestAnimationFrame(loop);
 }
 
@@ -215,6 +236,10 @@ function step() {
     P.poseMasturbation(vrm, M, d, t, intensity);
   } else if (st.scene === 'fellation') {
     P.poseFellation(vrm, M, F, d, t, intensity, intensity >= 1 || st.state === 'final');
+  } else if (st.scene === 'chevauche') {
+    P.poseRiding(vrm, M, R, d, t, intensity);
+  } else if (st.scene === 'twerk') {
+    P.poseTwerk(vrm, M, d, t, intensity);
   } else {
     P.resetPose(vrm, M); restPose();
     const hips = B('hips'), spine = B('spine'), chest = B('chest') || B('upperChest'), neck = B('neck'), head = B('head');
@@ -235,11 +260,13 @@ function step() {
     const lu = B('leftUpperArm');
     if (lu) lu.rotation.set(0, 0, 1.15 - 0.08 * Math.sin(t * 1.1));
   }
-  if (st.scene !== 'danse') P.cameraFor(st.scene, cfg.view, vrm, M, F, camera); else frame();
+  if (st.scene !== 'danse') P.cameraFor(st.scene, cfg.view, vrm, M, st.scene === 'chevauche' ? R : F, camera); else frame();
 
   // expressions + clignements + bouche quand elle parle
   moodTargets(t);
   if (st.scene === 'fellation') { target.oh = 0.85; target.aa = 0.2; target.blink = Math.max(target.blink, 0.2); target.happy = 0.15; }
+  else if (st.scene === 'chevauche') { target.oh = Math.max(target.oh, 0.35 + 0.4 * d * intensity); target.blink = Math.max(target.blink, 0.35); target.happy = Math.max(target.happy, 0.35); }
+  else if (st.scene === 'twerk') { target.happy = Math.max(target.happy, 0.6); target.aa = Math.max(target.aa, 0.1 + 0.15 * d); }
   else if (st.scene === 'masturbation') { target.oh = Math.max(target.oh, 0.25 + 0.45 * d * intensity); target.blink = Math.max(target.blink, 0.3 + 0.25 * intensity); target.happy = Math.max(target.happy, 0.3); }
   if (t > nextBlink) { target.blink = 1; if (t > nextBlink + 0.12) nextBlink = t + 2 + Math.random() * 3; }
   if (performance.now() < st.talkUntil && st.scene !== 'fellation') { // bouche prise : elle ne parle pas
@@ -258,6 +285,7 @@ addEventListener('message', e => {
   switch (m.type) {
     case 'cfg':
       Object.assign(cfg, m.cfg);
+      if (!licenceOk) cfg.nude = 'habillee';
       if (m.cfg.nude === 'strip' && m.reset) st.stage = 0;
       if (vrm && cfg.scene !== 'auto' && cfg.scene !== st.scene) { st.sceneSince = 0; switchScene(cfg.scene); }
       frame(); applyWear(); break;

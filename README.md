@@ -117,10 +117,13 @@ Dépose un modèle **VRM** (`.vrm`) dans `extension/modele/`, puis recharge l'ex
 
 **Ce qu'elle fait** (popup → *Ce qu'elle fait*) :
 
-- **Auto** (par défaut) : strip-tease d'abord ; une fois nue, **elle se masturbe** quand le rythme est moyen, et **te suce** quand ça s'accélère et pendant le final.
+- **Auto** (par défaut) : strip-tease d'abord, puis les scènes ci-dessous selon le rythme.
 - **Masturbation** : à genoux jambes écartées, les doigts sur son sexe au rythme, l'autre main qui pétrit son sein, la tête qui part en arrière quand c'est fort.
 - **Fellation** : à genoux, elle lève les yeux vers toi. **Sa bouche suit la position du funscript** (quand le script descend, elle te prend plus profond), sinon le rythme des beats. Quand ça va vite, elle branle la base en même temps.
-- **Vue** : **subjective (POV)** ou **de côté**.
+- **Chevauche** : à genoux de dos, reins cambrés, elle monte et descend sur un gode posé au sol en te regardant par-dessus son épaule.
+- **Twerk** : penchée en avant, mains sur les genoux, les fesses qui claquent au rythme.
+- **Vue** : **principale** (POV ; de dos en contre-plongée pour chevauche et twerk) ou **de côté**.
+- En **Auto**, une fois nue : twerk ou masturbation quand le rythme est moyen, fellation ou chevauche quand ça s'accélère, fellation pour le final.
 
 Ces animations sont calculées par programme : crédibles, mais un peu raides. Pour un rendu d'artiste, dépose des animations **`.vrma`** dans `extension/animations/` (voir le `LISEZ-MOI.txt` du dossier). GoonFap les joue à la place, à la vitesse du tempo.
 

@@ -200,6 +200,8 @@
     const m = e.data;
     if (m.type === 'ready') {
       comp.ready = true; comp.ok = !!m.ok; comp.name = m.name || ''; comp.author = m.author || '';
+      comp.licence = m.licence || null; comp.report = m.report || null; comp.wear = m.wear; comp.nude = m.nude; comp.error = m.error || null;
+      if (m.ok && m.licence && !(m.licence.sexual && m.licence.modif)) message(`💃 ${comp.name} : sa licence n'autorise pas l'usage sexuel<small>Elle restera habillée, sans scènes sexuelles. Choisis un modèle marqué « Expression sexuelle : autorisée ».</small>`, 7000, { speak: false });
       if (m.ok) { compCfg(true); }
       placeComp();
     } else if (m.type === 'stripped' && S.talk > 0) {
@@ -462,6 +464,7 @@
       goonfap: chrome.runtime.getManifest().version, site: location.hostname, browser: navigator.userAgent.replace(/.*(Chrome|Edg)\/(\d+).*/, '$1 $2'),
       video: v ? { size: [Math.round(v.getBoundingClientRect().width), Math.round(v.getBoundingClientRect().height)], inShadowOrIframe: !document.contains(v), t: +v.currentTime.toFixed(2), duration: +(v.duration || 0).toFixed(1), paused: v.paused, rvfc: !!v.requestVideoFrameCallback, clock: vclock.ok, parents: (() => { const a = []; for (let q = v.parentElement; q && a.length < 4; q = q.parentElement) a.push(desc(q)); return a; })() } : null,
       fullscreen: desc(fe), hostIn: desc(host.parentElement), popover: usePopover ? host.matches(':popover-open') : 'non', screen: [innerWidth, innerHeight],
+      compagne: comp.ready ? { ok: comp.ok, nom: comp.name, auteur: comp.author, licence: comp.licence, vetements: comp.wear, peauNue: comp.nude, bilan: comp.report, erreur: comp.error } : 'pas encore chargée',
       fsLog: fsLogs, cinema: !!(imm && imm.keep), cover: S.cover,
       hid, pad: p ? { id: p.id, vib: !!p.vibrationActuator } : null, padPage: mainPad,
       source: S.source, used: src(), fOffset: S.fOffset, fMode: S.fMode, vOffset: S.vOffset, lane: !!S.lane, vision: vis.ok,
