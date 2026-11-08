@@ -61,6 +61,8 @@
   // Journal du plein écran (pour le diagnostic 🩺)
   const fsLogs = [];
   function fsLog(ev, extra) { fsLogs.push(`${(performance.now() / 1000).toFixed(1)}s ${ev}${extra ? ' ' + extra : ''}`); if (fsLogs.length > 20) fsLogs.shift(); }
+  // Déplacer l'overlay sans recharger ses cadres (compagne 3D, GIF) : moveBefore (Chrome récent), sinon appendChild
+  const moveHost = parent => { try { if (parent.moveBefore) { parent.moveBefore(host, null); return; } } catch (e) {} parent.appendChild(host); };
   function raise() {
     const isOpen = () => { try { return usePopover && host.matches(':popover-open'); } catch (e) { return false; } };
     const fe = document.fullscreenElement;
@@ -68,10 +70,10 @@
       // En plein écran du lecteur : GoonFap se place DANS le lecteur, sans toucher à la couche du dessus
       // (sur certains Chrome, ouvrir une couche du dessus fait ressortir du plein écran).
       if (isOpen()) { try { host.hidePopover(); } catch (e) {} }
-      if (host.parentNode !== fe) fe.appendChild(host);
+      if (host.parentNode !== fe) moveHost(fe);
       return;
     }
-    if (host.parentNode !== document.documentElement) { if (isOpen()) { try { host.hidePopover(); } catch (e) {} } document.documentElement.appendChild(host); }
+    if (host.parentNode !== document.documentElement) { if (isOpen()) { try { host.hidePopover(); } catch (e) {} } moveHost(document.documentElement); }
     if (usePopover) { try { if (isOpen()) host.hidePopover(); host.showPopover(); } catch (e) {} }
   }
   const root = host.attachShadow({ mode: 'open' });
@@ -188,7 +190,7 @@
     const show = comp.ok && S.compagne;
     compFrame.classList.toggle('hidden', !show);
     if (!show) return;
-    const h = Math.round(innerHeight * S.compSize), w = Math.round(h * (S.compFrame === 'entiere' ? 0.5 : 0.75));
+    const h = Math.round(innerHeight * S.compSize), w = Math.round(h * 0.9);
     let bottom = 0;
     if (src() === 'visual' && laneNow) bottom = Math.max(0, innerHeight - laneNow.y + 8); // jamais sur la barre rythmo
     Object.assign(compFrame.style, { width: w + 'px', height: h + 'px', bottom: bottom + 'px', left: S.compSide === 'droite' ? 'auto' : '0', right: S.compSide === 'droite' ? '0' : 'auto' });

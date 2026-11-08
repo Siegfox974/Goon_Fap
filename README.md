@@ -125,6 +125,8 @@ Dépose un modèle **VRM** (`.vrm`) dans `extension/modele/`, puis recharge l'ex
 - **Vue** : **principale** (POV ; de dos en contre-plongée pour chevauche et twerk) ou **de côté**.
 - En **Auto**, une fois nue : twerk ou masturbation quand le rythme est moyen, fellation ou chevauche quand ça s'accélère, fellation pour le final.
 
+Elle est **toujours cadrée en entier**, sur fond transparent : la vidéo reste visible tout autour, et elle reste affichée dans le plein écran du site. Taille et côté se règlent dans le popup.
+
 Ces animations sont calculées par programme : crédibles, mais un peu raides. Pour un rendu d'artiste, dépose des animations **`.vrma`** dans `extension/animations/` (voir le `LISEZ-MOI.txt` du dossier). GoonFap les joue à la place, à la vitesse du tempo.
 
 GoonFap retire les vêtements et prépare une **peau nue** tout seul, en mémoire, sans modifier ton fichier : il efface ce qui est peint sur la peau (collants, culotte) et dessine aréoles, tétons et sexe aux bons endroits.

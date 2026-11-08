@@ -117,6 +117,52 @@ function wantedScene(now) {
   if (st.mood === 'medium') return pickIn(midSet);
   return st.scene === 'danse' ? 'twerk' : st.scene;
 }
+// ---------- Cadrage automatique : elle est toujours visible EN ENTIER ----------
+// Pour chaque scène, on calcule (une fois) la sphère qui contient tout son corps et les accessoires
+// sur l'ensemble du mouvement, puis on place la caméra pour que cette sphère tienne dans l'image.
+const VIEW_DIR = {
+  danse: { pov: [0, 0.12, 1], cote: [0.8, 0.12, 0.6] },
+  masturbation: { pov: [0, 0.35, 1], cote: [1, 0.2, 0.55] },
+  fellation: { pov: [0.35, 0.5, 1], cote: [1, 0.15, 0.05] },
+  chevauche: { pov: [0.25, -0.02, -1], cote: [1, 0.15, -0.4] },
+  twerk: { pov: [0.3, 0.1, -1], cote: [1, 0.1, -0.25] },
+};
+const fits = {};
+function poseScene(sc, d, t = 0) {
+  if (sc === 'masturbation') P.poseMasturbation(vrm, M, d, t, 1);
+  else if (sc === 'fellation') P.poseFellation(vrm, M, F, d, t, 1, false);
+  else if (sc === 'chevauche') P.poseRiding(vrm, M, R, d, t, 1);
+  else if (sc === 'twerk') P.poseTwerk(vrm, M, d, t, 1);
+  else { P.resetPose(vrm, M); restPose(); }
+  vrm.scene.updateMatrixWorld(true);
+}
+function computeFit(sc) {
+  const pts = [];
+  const names = ['head', 'neck', 'hips', 'chest', 'leftHand', 'rightHand', 'leftLowerArm', 'rightLowerArm', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot', 'leftToes', 'rightToes'];
+  for (const d of [0, 0.5, 1]) {
+    poseScene(sc, d);
+    for (const n of names) { const b = B(n); if (b) pts.push(P.wpos(b).clone()); }
+    const h = B('head'); if (h) pts.push(new THREE.Vector3(0, 0.17 * M.s, 0).applyMatrix4(h.matrixWorld)); // haut du crâne
+  }
+  const prop = sc === 'fellation' ? F : sc === 'chevauche' ? R : null;
+  if (prop) { pts.push(prop.tip.clone()); if (prop.base) pts.push(prop.base.clone()); else pts.push(prop.tip.clone().addScaledVector(prop.axis, 0.2 * M.s)); }
+  const box = new THREE.Box3().setFromPoints(pts);
+  const center = box.getCenter(new THREE.Vector3());
+  let radius = 0; for (const p of pts) radius = Math.max(radius, p.distanceTo(center));
+  return { center, radius: radius + 0.06 * M.s };
+}
+function fitCamera(sc) {
+  if (cfg.frame === 'buste' && sc === 'danse') { frame(); return; }
+  const key = sc;
+  if (!fits[key]) { const saved = vrm.scene.matrixWorld.clone(); fits[key] = computeFit(sc); }
+  const f = fits[key];
+  const dir = new THREE.Vector3(...(VIEW_DIR[sc] || VIEW_DIR.danse)[cfg.view === 'cote' ? 'cote' : 'pov']).normalize();
+  const vfov = THREE.MathUtils.degToRad(camera.fov), hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
+  const dist = f.radius / Math.sin(Math.min(vfov, hfov) / 2) * 1.02;
+  camera.position.copy(f.center).addScaledVector(dir, dist);
+  camera.lookAt(f.center);
+}
+
 function switchScene(sc) {
   if (sc === st.scene) return;
   st.scene = sc; st.sceneSince = performance.now();
@@ -125,6 +171,7 @@ function switchScene(sc) {
   if (sc === 'chevauche' && !R) R = P.setupRiding(vrm, M, scene);
   if (F) F.group.visible = sc === 'fellation';
   if (R) R.group.visible = sc === 'chevauche';
+  if (!fits[sc]) fits[sc] = computeFit(sc);
   // petit fondu pour masquer le changement de pose
   renderer.domElement.style.transition = 'none'; renderer.domElement.style.opacity = '0';
   requestAnimationFrame(() => { renderer.domElement.style.transition = 'opacity .45s'; renderer.domElement.style.opacity = '1'; });
@@ -260,7 +307,7 @@ function step() {
     const lu = B('leftUpperArm');
     if (lu) lu.rotation.set(0, 0, 1.15 - 0.08 * Math.sin(t * 1.1));
   }
-  if (st.scene !== 'danse') P.cameraFor(st.scene, cfg.view, vrm, M, st.scene === 'chevauche' ? R : F, camera); else frame();
+  fitCamera(st.scene);
 
   // expressions + clignements + bouche quand elle parle
   moodTargets(t);

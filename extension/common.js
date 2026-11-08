@@ -2,10 +2,10 @@
 /* eslint-disable no-var */
 var GF = globalThis.GF || (globalThis.GF = (() => {
   const DEFAULTS = {
-    _v: 6,
+    _v: 7,
     compagne: true,    // personnage 3D (dossier modele/) par-dessus la vidéo
     compNude: 'strip', // 'strip' (se déshabille pendant la séance) | 'nue' | 'habillee'
-    compFrame: 'buste',// 'buste' | 'entiere'
+    compFrame: 'entiere',// 'buste' | 'entiere'
     compSide: 'gauche',// 'gauche' | 'droite'
     compSize: 0.6,     // hauteur (fraction de l'écran)
     compScene: 'auto', // 'auto' | 'danse' | 'masturbation' | 'fellation' | 'chevauche' | 'twerk'
@@ -268,7 +268,8 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     if ((s._v || 0) < 3) { s.beatSfx = true; s.source = 'auto'; }
     if ((s._v || 0) < 4) { s.beatKind = 'fap'; }
     if ((s._v || 0) < 5) { s.moans = false; }
-    if ((s._v || 0) < 6) { s.cover = true; s._v = 6; }
+    if ((s._v || 0) < 6) { s.cover = true; }
+    if ((s._v || 0) < 7) { s.compFrame = 'entiere'; s._v = 7; }
     return s;
   }
 
