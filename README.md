@@ -37,6 +37,12 @@ GoonFap le **détecte tout seul** sur la page et vibre sur chaque coup du script
 
 Par défaut, la source est sur **Auto** : le funscript s'il y en a un, sinon la barre rythmo calée avec 🎯, sinon le son. Le bouton de source du panneau permet de forcer un mode.
 
+### La manette ne vibre pas ?
+
+1. Dans le popup, clique sur **🎮 Tester la manette** et appuie sur un bouton de la manette. Elle doit vibrer à fond.
+2. Si elle n'est pas vue : branche-la **en USB**, c'est le plus fiable.
+3. Sur la page de la vidéo, **clique une fois dans la page puis appuie sur un bouton de la manette**. Chrome ne montre la manette à une page qu'après ça. La ligne 🎮 du panneau doit afficher « Manette prête ».
+
 ### Utiliser
 
 1. Branche la manette et appuie sur un bouton.
@@ -78,8 +84,8 @@ Le panneau permet aussi de :
 
 ### Plein écran
 
-Le bouton **⛶** du panneau passe la page en plein écran et plaque la vidéo sur tout l'écran, avec ses contrôles (lecture, avance, volume). Les messages, GIF et vibrations restent actifs.
-Si tu utilises le plein écran du site, GoonFap se glisse dedans aussi. Si un site bloque tout, **F11** marche toujours.
+Utilise le **bouton plein écran du site**, ou **⛶** dans le panneau, qui fait la même chose. GoonFap s'affiche par-dessus et son panneau reste cliquable.
+Avec le plein écran natif de la vidéo (double-clic sur certaines vidéos), les messages et GIF s'affichent, mais Chrome empêche de cliquer sur le panneau. Si un site bloque tout, **F11** marche toujours.
 
 ### Tes GIF : dossier `extension/gifs/`
 
@@ -92,9 +98,11 @@ GoonFap en affiche sur les côtés de l'écran pendant la séance, jamais sur la
 
 | Le fichier contient… | Utilisé pour |
 |---|---|
-| *Plaps*, *In & Out*, *Slap*, *Thrust* | Un claquement sur **chaque beat** (à activer dans le popup) |
-| *Oral*, *Mouth*, *Suck*, *Wet* | Bruitage « bouche » sur chaque beat (au choix dans le popup) |
-| *Cum*, *Climax*, *Orgasm* | L'orgasme (fin de vidéo, bouton Je jouis) |
+| *Wet*, *In & Out*, *Handjob*, *Fap*, *Stroke* | **Bruit de branlette sur chaque beat** (par défaut) |
+| *Plaps*, *Slap*, *Thrust* | Claquements sur chaque beat (au choix dans le popup) |
+| *Oral*, *Mouth*, *Suck* | Bruitage « bouche » sur chaque beat (au choix dans le popup) |
+| *Climax*, *Orgasm* dans un pack de **voix féminine** | L'orgasme d'elle (fin de vidéo, bouton Je jouis) |
+| Voix masculines (`[M]`, *male*…), bruitages de sperme (*Cum*) | Ignorés |
 | *Moan*… *Low* / *Soft* | Gémissements doux, tempo lent |
 | *Moan* (sans précision) | Gémissements, tempo moyen |
 | *Moan*… *High* / *Intense* | Gros gémissements, tempo rapide |
