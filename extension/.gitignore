@@ -7,3 +7,5 @@ sons/**/*
 !sons/*/.gitkeep
 modele/*
 !modele/LISEZ-MOI.txt
+animations/*
+!animations/LISEZ-MOI.txt

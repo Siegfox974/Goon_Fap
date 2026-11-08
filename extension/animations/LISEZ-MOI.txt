@@ -1,0 +1,9 @@
+(Facultatif) Dépose ici des animations d'artistes au format .vrma pour remplacer
+les animations calculées par GoonFap. Le nom du fichier décide de la scène :
+
+  …mastur… / …fap… / …finger… / …solo…   → elle se masturbe
+  …blow… / …fella… / …suck… / …bj…      → fellation
+  …dance… / …idle… / …strip…            → danse
+
+GoonFap les joue en boucle et accélère / ralentit leur vitesse selon le tempo de la vidéo.
+Vérifie que leur licence autorise cet usage. Puis : chrome://extensions → « Recharger ».

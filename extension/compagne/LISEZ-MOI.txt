@@ -2,3 +2,4 @@ Bibliothèques 3D embarquées (licence MIT, voir les fichiers LICENSE-*.txt) :
 - three.js 0.160.0 (https://threejs.org)
 - @pixiv/three-vrm 2.1.0 (https://github.com/pixiv/three-vrm)
 Les imports "three" ont été remplacés par des chemins relatifs pour fonctionner dans l'extension.
+- @pixiv/three-vrm-animation 2.1.0 (https://github.com/pixiv/three-vrm), même licence MIT

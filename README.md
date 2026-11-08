@@ -115,6 +115,15 @@ Dépose un modèle **VRM** (`.vrm`) dans `extension/modele/`, puis recharge l'ex
 - ses expressions suivent le moment : douce, puis excitée, moue taquine aux STOP et au bord, visage d'orgasme à la fin ;
 - **strip-tease** (par défaut) : elle enlève une pièce à chaque fois que tu es au bord, à chaque reprise après une pause, et toutes les ~3 minutes. Elle est entièrement nue pour le final.
 
+**Ce qu'elle fait** (popup → *Ce qu'elle fait*) :
+
+- **Auto** (par défaut) : strip-tease d'abord ; une fois nue, **elle se masturbe** quand le rythme est moyen, et **te suce** quand ça s'accélère et pendant le final.
+- **Masturbation** : à genoux jambes écartées, les doigts sur son sexe au rythme, l'autre main qui pétrit son sein, la tête qui part en arrière quand c'est fort.
+- **Fellation** : à genoux, elle lève les yeux vers toi. **Sa bouche suit la position du funscript** (quand le script descend, elle te prend plus profond), sinon le rythme des beats. Quand ça va vite, elle branle la base en même temps.
+- **Vue** : **subjective (POV)** ou **de côté**.
+
+Ces animations sont calculées par programme : crédibles, mais un peu raides. Pour un rendu d'artiste, dépose des animations **`.vrma`** dans `extension/animations/` (voir le `LISEZ-MOI.txt` du dossier). GoonFap les joue à la place, à la vitesse du tempo.
+
 GoonFap retire les vêtements et prépare une **peau nue** tout seul, en mémoire, sans modifier ton fichier : il efface ce qui est peint sur la peau (collants, culotte) et dessine aréoles, tétons et sexe aux bons endroits.
 Le bouton **💃** du panneau l'affiche ou la cache. Tenue, cadrage (buste / en entier), côté et taille se règlent dans le popup.
 
@@ -164,7 +173,7 @@ Une bonne source est l'[OpenNSFW Sound Pack](https://opennsfw.carrd.co/), gratui
 - le **SFX Pack** contient les claquements, la bouche et les orgasmes ;
 - les **gémissements** sont dans les packs de voix (*MoanPack*, *VoicePack*) du même site.
 
-Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/`, `sons/` et `modele/` sont ignorés par git.
+Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/`, `sons/`, `modele/` et `animations/` sont ignorés par git.
 
 ## L'application web (vidéos sur ton PC, programmes générés)
 

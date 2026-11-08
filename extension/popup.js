@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const FIELDS = ['compagne', 'compNude', 'compFrame', 'compSide', 'compSize', 'cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
+const FIELDS = ['compScene', 'compView', 'compagne', 'compNude', 'compFrame', 'compSide', 'compSize', 'cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
   'voiceRate', 'voicePitch', 'clips', 'moans', 'clipVol', 'beatSfx', 'beatVol', 'gifs', 'gifEvery', 'gifDur', 'gifSize',
   'sens', 'band', 'minGap', 'predict', 'offset'];
 const NUM = new Set(['compSize', 'fOffset', 'power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);

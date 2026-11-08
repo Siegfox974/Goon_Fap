@@ -5,9 +5,17 @@ import * as THREE from './lib/three.module.js';
 import { GLTFLoader } from './lib/GLTFLoader.js';
 import { VRMLoaderPlugin, VRMUtils } from './lib/three-vrm.module.js';
 import { nudify, clothes } from './nudify.js';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from './lib/three-vrm-animation.module.js';
+import * as P from './poses.js';
 
-const cfg = { nude: 'strip', frame: 'buste' }; // nude : 'nue' | 'strip' | 'habillee' ; frame : 'buste' | 'entiere'
-const st = { e: 0, phase: 0, lastBeat: 0, period: 600, mood: 'warm', state: 'play', talkUntil: 0, cumUntil: 0, stage: 0 };
+// nude : 'nue' | 'strip' | 'habillee' ; frame : 'buste' | 'entiere'
+// scene : 'auto' | 'danse' | 'masturbation' | 'fellation' ; view : 'pov' | 'cote'
+const cfg = { nude: 'strip', frame: 'buste', scene: 'auto', view: 'pov' };
+const st = { e: 0, phase: 0, lastBeat: 0, period: 600, mood: 'warm', state: 'play', talkUntil: 0, cumUntil: 0, stage: 0,
+  pos: null, posAt: 0, scene: 'danse', sceneSince: 0 };
+let M = null, F = null;                       // mesures du modèle, scène fellation (sexe masculin)
+const anims = {};                             // animations .vrma par scène (dossier animations/)
+let mixer = null, action = null, actionScene = null;
 let vrm = null, renderer, scene, camera, clock, skin = null, origTex = null, nudeRep = null, wear = [];
 
 const post = m => parent.postMessage(Object.assign({ gf: 'compagne' }, m), '*');
@@ -75,6 +83,52 @@ function stripMore(why) {
   post({ type: 'stripped', stage: st.stage, total: wear.length, why });
 }
 
+// ---------- Animations d'artistes (.vrma, dossier animations/) ----------
+const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbation' : /blow|fella|suck|bj|oral|pipe/i.test(f) ? 'fellation' : /dance|danse|idle|tease|strip/i.test(f) ? 'danse' : null;
+async function loadAnims(loader) {
+  const files = (await GF.listDir('animations')).filter(f => /\.vrma$/i.test(f));
+  if (!files.length) return;
+  const l = new GLTFLoader(); l.register(p => new VRMAnimationLoaderPlugin(p));
+  for (const f of files) {
+    const sc = SCENE_OF(f); if (!sc) continue;
+    try {
+      const g = await l.loadAsync(chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/')));
+      const va = g.userData.vrmAnimations && g.userData.vrmAnimations[0];
+      if (va) (anims[sc] = anims[sc] || []).push(createVRMAnimationClip(va, vrm));
+    } catch (e) {}
+  }
+  if (Object.keys(anims).length) { mixer = new THREE.AnimationMixer(vrm.scene); post({ type: 'anims', scenes: Object.keys(anims) }); }
+}
+
+// ---------- Choix de la scène ----------
+const naked = () => cfg.nude === 'nue' || st.stage >= wear.length;
+function wantedScene(now) {
+  if (cfg.scene !== 'auto') return cfg.scene;
+  if (st.state === 'pause' || st.state === 'edge') return st.scene === 'danse' ? 'danse' : st.scene; // elle se fige, la moue aux lèvres
+  if (cfg.nude === 'habillee' || !naked()) return 'danse';                                           // d'abord le strip-tease
+  if (st.state === 'final' || st.state === 'cum' || st.mood === 'fast' || st.mood === 'faster') return 'fellation';
+  if (st.mood === 'medium') return 'masturbation';
+  return st.scene === 'danse' ? 'masturbation' : st.scene;
+}
+function switchScene(sc) {
+  if (sc === st.scene) return;
+  st.scene = sc; st.sceneSince = performance.now();
+  if (sc !== 'danse' && cfg.nude !== 'habillee' && !naked()) { st.stage = wear.length; applyWear(); } // elle se met nue pour ça
+  if (sc === 'fellation' && !F) F = P.setupFellation(vrm, M, scene);
+  if (F) F.group.visible = sc === 'fellation';
+  // petit fondu pour masquer le changement de pose
+  renderer.domElement.style.transition = 'none'; renderer.domElement.style.opacity = '0';
+  requestAnimationFrame(() => { renderer.domElement.style.transition = 'opacity .45s'; renderer.domElement.style.opacity = '1'; });
+  if (action) { action.fadeOut(0.3); action = null; actionScene = null; }
+  post({ type: 'scene', scene: sc });
+}
+// profondeur 0..1 : position du funscript si on l'a (bas = profond), sinon le rythme des beats
+function depth(now) {
+  if (st.pos != null && now - st.posAt < 400) return 1 - st.pos;
+  const ph = Math.min(1, (now - st.lastBeat) / Math.max(120, st.period));
+  return 0.5 + 0.5 * Math.cos(ph * Math.PI * 2);
+}
+
 async function load() {
   setupScene();
   const path = await findModel();
@@ -95,6 +149,8 @@ async function load() {
   try { nudeRep = await nudify(vrm, renderer); if (nudeRep.ok) { nudeRep.tex = skin.mats[0].map; setSkin(false); } } catch (e) { nudeRep = null; }
   wear = groupWear(clothes(vrm));
   if (vrm.lookAt) vrm.lookAt.target = camera;
+  M = P.measure(vrm);
+  loadAnims(loader).catch(() => {});
   restPose();
   frame();
   applyWear();
@@ -143,28 +199,50 @@ function step() {
   const ph = active ? Math.min(1, sinceBeat / Math.max(120, st.period)) : 0;
   const stroke = Math.sin(ph * Math.PI * 2) * amp;      // va-et-vient calé sur le beat
 
-  const hips = B('hips'), spine = B('spine'), chest = B('chest') || B('upperChest'), neck = B('neck'), head = B('head');
-  const breathe = Math.sin(t * 1.6) * 0.02;
-  if (hips) { hips.rotation.x = -0.10 * st.e * amp + 0.04 * stroke; hips.rotation.y = Math.sin(t * 0.7) * 0.05; hips.rotation.z = Math.sin(t * 0.9) * 0.04 * amp; hips.position.y = -0.025 * st.e * amp; }
-  if (spine) spine.rotation.x = 0.06 * st.e * amp + breathe;
-  if (chest) chest.rotation.x = 0.04 * st.e * amp - breathe * 0.5;
-  if (neck) neck.rotation.x = -0.03 * st.e * amp;
-  if (head) { head.rotation.z = Math.sin(t * 0.5) * 0.06; head.rotation.x = 0.04 * Math.sin(t * 0.8); }
-  // bras droit : geste de va-et-vient (comme si elle te branlait) quand ça tourne
-  const ru = B('rightUpperArm'), rl = B('rightLowerArm'), rh = B('rightHand');
-  if (ru && rl) {
-    const k = active && st.state !== 'edge' ? 1 : 0;
-    ru.rotation.set(-0.55 * k + 0.12 * stroke * k, 0.25 * k, -1.15 + 0.55 * k);
-    rl.rotation.set(0, 0.25 + 1.2 * k + 0.35 * stroke * k, 0);
-    if (rh) rh.rotation.set(0, 0, 0.3 * k);
+  const now = performance.now();
+  const want = wantedScene(now);
+  if (want !== st.scene && now - st.sceneSince > 8000) switchScene(want); // pas plus d'un changement toutes les 8 s
+  const intensity = st.mood === 'fast' || st.mood === 'faster' ? 1 : st.mood === 'medium' ? 0.7 : 0.45;
+  const d = active ? depth(now) : 0.15;
+  const clips = anims[st.scene];
+  if (mixer && clips && clips.length) {
+    // animation d'artiste : on la joue, à une vitesse calée sur le tempo
+    if (actionScene !== st.scene) { action = mixer.clipAction(clips[Math.floor(Math.random() * clips.length)]); action.reset().fadeIn(0.3).play(); actionScene = st.scene; }
+    const clipDur = action.getClip().duration;
+    action.timeScale = active ? Math.max(0.3, Math.min(3, clipDur < 2.5 ? clipDur / (st.period / 1000) : (60000 / st.period) / 110)) : 0.4;
+    mixer.update(dt);
+  } else if (st.scene === 'masturbation') {
+    P.poseMasturbation(vrm, M, d, t, intensity);
+  } else if (st.scene === 'fellation') {
+    P.poseFellation(vrm, M, F, d, t, intensity, intensity >= 1 || st.state === 'final');
+  } else {
+    P.resetPose(vrm, M); restPose();
+    const hips = B('hips'), spine = B('spine'), chest = B('chest') || B('upperChest'), neck = B('neck'), head = B('head');
+    const breathe = Math.sin(t * 1.6) * 0.02;
+    if (hips) { hips.rotation.x = -0.10 * st.e * amp + 0.04 * stroke; hips.rotation.y = Math.sin(t * 0.7) * 0.05; hips.rotation.z = Math.sin(t * 0.9) * 0.04 * amp; hips.position.y = M.hipsRest.y - 0.025 * st.e * amp; }
+    if (spine) spine.rotation.x = 0.06 * st.e * amp + breathe;
+    if (chest) chest.rotation.x = 0.04 * st.e * amp - breathe * 0.5;
+    if (neck) neck.rotation.x = -0.03 * st.e * amp;
+    if (head) { head.rotation.z = Math.sin(t * 0.5) * 0.06; head.rotation.x = 0.04 * Math.sin(t * 0.8); }
+    // bras droit : geste de va-et-vient (comme si elle te branlait) quand ça tourne
+    const ru = B('rightUpperArm'), rl = B('rightLowerArm'), rh = B('rightHand');
+    if (ru && rl) {
+      const k = active && st.state !== 'edge' ? 1 : 0;
+      ru.rotation.set(-0.55 * k + 0.12 * stroke * k, 0.25 * k, -1.15 + 0.55 * k);
+      rl.rotation.set(0, 0.25 + 1.2 * k + 0.35 * stroke * k, 0);
+      if (rh) rh.rotation.set(0, 0, 0.3 * k);
+    }
+    const lu = B('leftUpperArm');
+    if (lu) lu.rotation.set(0, 0, 1.15 - 0.08 * Math.sin(t * 1.1));
   }
-  const lu = B('leftUpperArm');
-  if (lu) lu.rotation.set(0, 0, 1.15 - 0.08 * Math.sin(t * 1.1));
+  if (st.scene !== 'danse') P.cameraFor(st.scene, cfg.view, vrm, M, F, camera); else frame();
 
   // expressions + clignements + bouche quand elle parle
   moodTargets(t);
+  if (st.scene === 'fellation') { target.oh = 0.85; target.aa = 0.2; target.blink = Math.max(target.blink, 0.2); target.happy = 0.15; }
+  else if (st.scene === 'masturbation') { target.oh = Math.max(target.oh, 0.25 + 0.45 * d * intensity); target.blink = Math.max(target.blink, 0.3 + 0.25 * intensity); target.happy = Math.max(target.happy, 0.3); }
   if (t > nextBlink) { target.blink = 1; if (t > nextBlink + 0.12) nextBlink = t + 2 + Math.random() * 3; }
-  if (performance.now() < st.talkUntil) {
+  if (performance.now() < st.talkUntil && st.scene !== 'fellation') { // bouche prise : elle ne parle pas
     const s = Math.abs(Math.sin(t * 13)) * 0.6 + Math.abs(Math.sin(t * 7.3)) * 0.3;
     target.aa = Math.max(target.aa, s * 0.7); target.oh = Math.max(target.oh, (1 - s) * 0.3);
   }
@@ -181,6 +259,7 @@ addEventListener('message', e => {
     case 'cfg':
       Object.assign(cfg, m.cfg);
       if (m.cfg.nude === 'strip' && m.reset) st.stage = 0;
+      if (vrm && cfg.scene !== 'auto' && cfg.scene !== st.scene) { st.sceneSince = 0; switchScene(cfg.scene); }
       frame(); applyWear(); break;
     case 'beat': {
       const now = performance.now(), iv = now - st.lastBeat;
@@ -189,6 +268,7 @@ addEventListener('message', e => {
       break;
     }
     case 'mood': st.mood = m.kind; break;
+    case 'pos': st.pos = m.p; st.posAt = performance.now(); break;
     case 'state':
       if (m.state === 'resume') { st.state = 'play'; stripMore('reprise'); }
       else if (m.state === 'edge') { st.state = 'edge'; stripMore('au bord'); }

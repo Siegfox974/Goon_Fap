@@ -193,7 +193,7 @@
     if (src() === 'visual' && laneNow) bottom = Math.max(0, innerHeight - laneNow.y + 8); // jamais sur la barre rythmo
     Object.assign(compFrame.style, { width: w + 'px', height: h + 'px', bottom: bottom + 'px', left: S.compSide === 'droite' ? 'auto' : '0', right: S.compSide === 'droite' ? '0' : 'auto' });
   }
-  function compCfg(reset) { toComp({ type: 'cfg', cfg: { nude: S.compNude, frame: S.compFrame }, reset }); placeComp(); }
+  function compCfg(reset) { toComp({ type: 'cfg', cfg: { nude: S.compNude, frame: S.compFrame, scene: S.compScene, view: S.compView }, reset }); placeComp(); }
   const STRIP_LINES = ['Tu veux voir la suite ? Mmh… 😈', 'Regarde bien… je l\'enlève pour toi.', 'Ça te plaît ? Branle-toi en me regardant.', 'Encore un peu plus nue pour toi…'];
   window.addEventListener('message', e => {
     if (e.source !== compFrame.contentWindow || !e.data || e.data.gf !== 'compagne') return;
@@ -503,6 +503,12 @@
     if (!v || v.paused || v.seeking) { if (fsState.timers.length) fsReset(); return; }
     const rate = v.playbackRate || 1;
     const t = videoMs(v) + S.fOffset * rate;
+    if (comp.ok && S.compagne && performance.now() - (fsState.posAt || 0) > 33) { // la compagne suit la position du script
+      fsState.posAt = performance.now();
+      const a = fsData.acts; let lo = 0, hi = a.length;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (a[m].at < t) lo = m + 1; else hi = m; }
+      if (lo > 0 && lo < a.length) { const p = a[lo - 1], q = a[lo], k = (t - p.at) / Math.max(1, q.at - p.at); toComp({ type: 'pos', p: (p.pos + (q.pos - p.pos) * k) / 100 }); }
+    }
     if (fsState.next < 0 || t < fsState.lastT - 50 || t - fsState.lastT > 600) { fsReset(); fsState.next = fsIndex(t); } // saut dans la vidéo
     fsState.lastT = t;
     if (S.fMode === 'flow') { fsFlow(v, t); return; }

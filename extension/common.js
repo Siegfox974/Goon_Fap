@@ -8,6 +8,8 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     compFrame: 'buste',// 'buste' | 'entiere'
     compSide: 'gauche',// 'gauche' | 'droite'
     compSize: 0.6,     // hauteur (fraction de l'écran)
+    compScene: 'auto', // 'auto' | 'danse' | 'masturbation' | 'fellation'
+    compView: 'pov',   // 'pov' (vue subjective) | 'cote'
     cover: true,       // plein écran : l'image remplit l'écran (plus de bandes noires, bords rognés)
     power: 1,          // 100 % = le max de la manette
     pulse: 140,        // ms par vibration
