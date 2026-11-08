@@ -31,6 +31,7 @@ async function findModel() {
     const r = await chrome.storage.local.get('settings');
     if (r.settings && r.settings.compModel) cfg.model = r.settings.compModel;
     if (r.settings && r.settings.animScenes) cfg.animScenes = r.settings.animScenes; // scènes choisies à la main dans le popup
+    if (r.settings) cfg.physics = r.settings.compPhysics !== false;
   } catch (e) {}
   const files = (await GF.listDir('modele')).filter(f => /\.(vrm|pmx)$/i.test(f));
   const want = files.find(f => f === cfg.model);
@@ -114,7 +115,7 @@ async function loadAnims(loader) {
       (anims[sc] = anims[sc] || []).push({ vmd: clip });
     } catch (e) { post({ type: 'anim-error', file: f, error: String(e && e.message || e) }); }
   }
-  if (Object.values(anims).some(l => l.some(a => a.vmd))) { if (!vrm.isPmx) feetRest = VMD.restFeet(vrm, M); else pmxMixer = new THREE.AnimationMixer(vrm.mesh); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') : 'vrma').join(',')) }); }
+  if (Object.values(anims).some(l => l.some(a => a.vmd))) { if (!vrm.isPmx) feetRest = VMD.restFeet(vrm, M); else pmxMixer = new THREE.AnimationMixer(vrm.mesh); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') + (a.vmd.pmxClip && a.vmd.pmxClip.userData.missing.length ? ` [${a.vmd.pmxClip.userData.missing.length}/${a.vmd.pmxClip.userData.used} os absents du modèle : ${a.vmd.pmxClip.userData.missing.slice(0, 12).join(' ')}]` : '') : 'vrma').join(',')) }); }
   const files = all.filter(f => /\.vrma$/i.test(f));
   if (!files.length || vrm.isPmx) return; // .vrma : modèles VRM seulement
   const l = new GLTFLoader(); l.register(p => new VRMAnimationLoaderPlugin(p));
@@ -327,7 +328,7 @@ async function loadPmxModel(path) {
     }
   } catch (e) { globalThis.Ammo = undefined; }
   const url = chrome.runtime.getURL(path.split('/').map(encodeURIComponent).join('/'));
-  vrm = await loadPmx(url, !!globalThis.Ammo && typeof globalThis.Ammo !== 'function');
+  vrm = await loadPmx(url, cfg.physics !== false && !!globalThis.Ammo && typeof globalThis.Ammo !== 'function');
   scene.add(vrm.mesh);
   M = P.measure(vrm);
   camera.near = 0.03 * M.s; camera.far = 80 * M.s; camera.updateProjectionMatrix();
@@ -341,6 +342,8 @@ async function loadPmxModel(path) {
   post({ type: 'ready', ok: true, name: vrm.meta.name || path.split('/').pop(), author: '', wear: wear.length, nude: true, licence: { format: 'pmx', note: 'licence non lisible dans un .pmx : vérifie-la toi-même' },
     report: { format: 'MMD (.pmx)', physique: vrm.physics, vetements: vrm.clothes().map(c => c.name), osTrouves: Object.keys(vrm.humanoid.humanBones).length, ecartMainSexeCm: r.sexe != null ? Math.round(r.sexe / M.s * 160) : null, ecartMainSeinCm: r.sein != null ? Math.round(r.sein / M.s * 160) : null } });
   requestAnimationFrame(loop);
+  // textures : bilan quelques secondes plus tard (elles se chargent après le modèle)
+  setTimeout(() => post({ type: 'tex', ok: vrm.texInfo.ok, failed: vrm.texInfo.failed.slice(0, 20), nFailed: vrm.texInfo.failed.length }), 6000);
 }
 
 // ---------- Pose et animation ----------

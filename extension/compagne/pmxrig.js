@@ -34,7 +34,12 @@ const CLOTH = [
 const NOT_CLOTH = /body|skin|face|脸|顔|肌|hair|髪|髮|刘海|马尾|前髪|後頭部|眉|睫|目|白目|口|歯|舌|tongue|eye|neck|pubes|汗|液|tattoo|乳纹|emotion|二重|呆毛/i;
 
 export async function loadPmx(url, physicsWanted) {
-  const loader = new MMDLoader();
+  // suivi du chargement des textures (diagnostic)
+  const texInfo = { ok: 0, failed: [] };
+  const manager = new THREE.LoadingManager();
+  manager.onError = u => texInfo.failed.push(decodeURIComponent(String(u).split('/').slice(-2).join('/')));
+  manager.onProgress = () => { texInfo.ok = manager.itemsLoaded - texInfo.failed.length; };
+  const loader = new MMDLoader(manager);
   const mesh = await new Promise((res, rej) => loader.load(url, res, undefined, rej));
   const bones = mesh.skeleton.bones;
   const byName = new Map(bones.map(b => [nk(b.name), b]));
@@ -74,7 +79,7 @@ export async function loadPmx(url, physicsWanted) {
     setExpr(k, w) { const i = morphIdx[k]; if (i !== undefined) mesh.morphTargetInfluences[i] = Math.max(mesh.morphTargetInfluences[i], w); },
     clearExpr() { for (const i of Object.values(morphIdx)) mesh.morphTargetInfluences[i] = 0; },
     clothes: () => clothes,
-    loader,
+    loader, texInfo, boneNames: new Set(bones.map(b => b.name)),
     meta: { name: nk(mesh.geometry.userData.MMD.modelName || ''), comment: '' },
   };
   return rig;
@@ -82,5 +87,11 @@ export async function loadPmx(url, physicsWanted) {
 
 /** Charge une animation .vmd pour ce modèle (lecture native, avec IK et morphs). */
 export function loadVmdFor(rig, url) {
-  return new Promise((res, rej) => rig.loader.loadAnimation(url, rig.mesh, res, undefined, rej));
+  return new Promise((res, rej) => rig.loader.loadAnimation(url, rig.mesh, clip => {
+    // os animés par le .vmd mais absents du modèle (squelette non standard) : pour le diagnostic
+    const used = new Set();
+    for (const t of clip.tracks) { const m = /\.bones\[(.+?)\]/.exec(t.name); if (m) used.add(m[1]); }
+    clip.userData = { missing: [...used].filter(n => !rig.boneNames.has(n)), used: used.size };
+    res(clip);
+  }, undefined, rej));
 }

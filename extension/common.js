@@ -11,6 +11,7 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     compModel: '',     // fichier du modèle dans modele/ ('' = le premier trouvé)
     animScenes: {},    // scène choisie à la main pour chaque fichier d'animation (popup)
     compAnim: '',      // animation imposée (bouton ▶ du popup), '' = automatique
+    compPhysics: true, // modèles MMD : physique (cheveux, seins…)
     compScene: 'auto', // 'auto' | 'danse' | 'masturbation' | 'fellation' | 'chevauche' | 'twerk'
     compView: 'pov',   // 'pov' (vue subjective) | 'cote'
     cover: true,       // plein écran : l'image remplit l'écran (plus de bandes noires, bords rognés)

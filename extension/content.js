@@ -209,6 +209,9 @@
     } else if (m.type === 'anims') {
       comp.anims = m.list;
       message(`💃 Animations chargées : ${m.scenes.join(', ')}`, 3500, { speak: false });
+    } else if (m.type === 'tex') {
+      comp.textures = { chargees: m.ok, echecs: m.nFailed, fichiers: m.failed };
+      if (m.nFailed) message(`💃 ${m.nFailed} texture(s) du modèle introuvable(s)<small>Vérifie que ses dossiers tex/, sp/, toon/ sont à côté du .pmx</small>`, 6000, { speak: false });
     } else if (m.type === 'anim-ignored') {
       comp.animIgnored = m.files;
       message(`💃 ${m.files.length} animation(s) ignorée(s) : leur nom ne dit pas la scène<small>Range-les dans un dossier animations/masturbation/ (ou fellation, chevauche, twerk, danse)</small>`, 7000, { speak: false });
@@ -474,7 +477,7 @@
       goonfap: chrome.runtime.getManifest().version, site: location.hostname, browser: navigator.userAgent.replace(/.*(Chrome|Edg)\/(\d+).*/, '$1 $2'),
       video: v ? { size: [Math.round(v.getBoundingClientRect().width), Math.round(v.getBoundingClientRect().height)], inShadowOrIframe: !document.contains(v), t: +v.currentTime.toFixed(2), duration: +(v.duration || 0).toFixed(1), paused: v.paused, rvfc: !!v.requestVideoFrameCallback, clock: vclock.ok, parents: (() => { const a = []; for (let q = v.parentElement; q && a.length < 4; q = q.parentElement) a.push(desc(q)); return a; })() } : null,
       fullscreen: desc(fe), hostIn: desc(host.parentElement), popover: usePopover ? host.matches(':popover-open') : 'non', screen: [innerWidth, innerHeight],
-      compagne: comp.ready ? { ok: comp.ok, nom: comp.name, auteur: comp.author, licence: comp.licence, vetements: comp.wear, peauNue: comp.nude, bilan: comp.report, erreur: comp.error, animations: comp.anims || 'aucune', ignorees: comp.animIgnored || [], erreursAnimations: comp.animErrors || [] } : 'pas encore chargée',
+      compagne: comp.ready ? { ok: comp.ok, nom: comp.name, auteur: comp.author, licence: comp.licence, vetements: comp.wear, peauNue: comp.nude, bilan: comp.report, erreur: comp.error, textures: comp.textures || '?', animations: comp.anims || 'aucune', ignorees: comp.animIgnored || [], erreursAnimations: comp.animErrors || [] } : 'pas encore chargée',
       fsLog: fsLogs, cinema: !!(imm && imm.keep), cover: S.cover,
       hid, pad: p ? { id: p.id, vib: !!p.vibrationActuator } : null, padPage: mainPad,
       source: S.source, used: src(), fOffset: S.fOffset, fMode: S.fMode, vOffset: S.vOffset, lane: !!S.lane, vision: vis.ok,
@@ -1088,7 +1091,7 @@
   let compModelLoaded = null, compAnimsLoaded = null;
   function onSettings() {
     // changement de modèle : on recharge la compagne
-    const animKey = JSON.stringify(S.animScenes || {});
+    const animKey = JSON.stringify(S.animScenes || {}) + '|' + S.compPhysics;
     if (compModelLoaded !== null && (S.compModel !== compModelLoaded || animKey !== compAnimsLoaded)) { comp.ok = false; comp.ready = false; compFrame.src = chrome.runtime.getURL('compagne/compagne.html') + '?m=' + Date.now(); placeComp(); }
     compModelLoaded = S.compModel; compAnimsLoaded = animKey;
     if (typeof compCfg === 'function' && comp.ok) compCfg(false);
