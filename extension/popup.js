@@ -1,6 +1,6 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const FIELDS = ['compScene', 'compView', 'compagne', 'compNude', 'compFrame', 'compSide', 'compSize', 'cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
+const FIELDS = ['compModel', 'compScene', 'compView', 'compagne', 'compNude', 'compFrame', 'compSide', 'compSize', 'cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
   'voiceRate', 'voicePitch', 'clips', 'moans', 'clipVol', 'beatSfx', 'beatVol', 'gifs', 'gifEvery', 'gifDur', 'gifSize',
   'sens', 'band', 'minGap', 'predict', 'offset'];
 const NUM = new Set(['compSize', 'fOffset', 'power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
@@ -97,8 +97,11 @@ function renderSoundList(files) {
 const LABELS = { fap: 'fap', lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes féminins',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
 async function counts() {
-  const mods = (await listDir('modele')).filter(f => /\.vrm$/i.test(f));
-  $('#comp-info').textContent = mods.length ? `Modèle : ${mods[0].split('/').pop()}` : 'Aucun modèle : dépose un fichier .vrm dans le dossier modele/ de l\'extension, puis recharge-la.';
+  const mods = (await listDir('modele')).filter(f => /\.(vrm|pmx)$/i.test(f));
+  const selM = $('#compModel');
+  for (const f of mods) { if (![...selM.options].some(o => o.value === f)) { const o = document.createElement('option'); o.value = f; o.textContent = f.replace(/^modele\//, '') + (/\.pmx$/i.test(f) ? ' (MMD)' : ' (VRM)'); selM.appendChild(o); } }
+  selM.value = S.compModel || '';
+  $('#comp-info').textContent = mods.length ? `${mods.length} modèle(s) trouvé(s).` : 'Aucun modèle : dépose un .vrm, ou le dossier complet d\'un modèle MMD (.pmx + textures), dans modele/, puis recharge l\'extension.';
   const g = await listDir('gifs');
   $('#gif-count').textContent = g.length ? `${g.length} fichier(s) dans gifs/.` : 'Aucun GIF : dépose tes .gif / .webp / .mp4 dans le dossier gifs/ de l\'extension, puis recharge-la.';
   const s = await GF.indexSounds();

@@ -1082,7 +1082,11 @@
   function sendSettings() {
     send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, cumSnd: S.cumSnd, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
   }
+  let compModelLoaded = null;
   function onSettings() {
+    // changement de modèle : on recharge la compagne
+    if (compModelLoaded !== null && S.compModel !== compModelLoaded) { comp.ok = false; comp.ready = false; compFrame.src = chrome.runtime.getURL('compagne/compagne.html') + '?m=' + Date.now(); placeComp(); }
+    compModelLoaded = S.compModel;
     if (typeof compCfg === 'function' && comp.ok) compCfg(false);
     if (fsData) { const nb = fsPick(); if (nb !== fsData.beats) { fsData.beats = nb; fsReset(); } }
     sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }

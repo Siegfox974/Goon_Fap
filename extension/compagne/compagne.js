@@ -8,24 +8,29 @@ import { nudify, clothes } from './nudify.js';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from './lib/three-vrm-animation.module.js';
 import * as P from './poses.js';
 import * as VMD from './vmd.js';
+import { loadPmx, loadVmdFor } from './pmxrig.js';
 
 // nude : 'nue' | 'strip' | 'habillee' ; frame : 'buste' | 'entiere'
 // scene : 'auto' | 'danse' | 'masturbation' | 'fellation' ; view : 'pov' | 'cote'
-const cfg = { nude: 'strip', frame: 'buste', scene: 'auto', view: 'pov' };
+const cfg = { nude: 'strip', frame: 'buste', scene: 'auto', view: 'pov', model: '' };
 const st = { e: 0, phase: 0, lastBeat: 0, period: 600, mood: 'warm', state: 'play', talkUntil: 0, cumUntil: 0, stage: 0,
   pos: null, posAt: 0, scene: 'danse', sceneSince: 0 };
 let M = null, F = null, R = null;            // mesures du modèle, fellation (sexe masculin), chevauche (gode)
 const anims = {};                             // animations .vrma par scène (dossier animations/)
 let mixer = null, action = null, actionScene = null;
 let feetRest = null, vmdCur = null, vmdTime = 0;            // animation MMD en cours
+let pmxMixer = null, pmxPlaying = null, resetPhys = false;    // modèle MMD : lecture native des .vmd, physique
 let licenceOk = true; // la licence du modèle autorise-t-elle la nudité / le sexe ?
 let vrm = null, renderer, scene, camera, clock, skin = null, origTex = null, nudeRep = null, wear = [];
 
 const post = m => parent.postMessage(Object.assign({ gf: 'compagne' }, m), '*');
 
+// Modèles disponibles : .vrm ou .pmx (MMD, avec ses textures dans le même dossier)
 async function findModel() {
-  const files = await GF.listDir('modele');
-  return files.find(f => /\.vrm$/i.test(f)) || null;
+  try { const r = await chrome.storage.local.get('settings'); if (r.settings && r.settings.compModel) cfg.model = r.settings.compModel; } catch (e) {}
+  const files = (await GF.listDir('modele')).filter(f => /\.(vrm|pmx)$/i.test(f));
+  const want = files.find(f => f === cfg.model);
+  return want || files[0] || null;
 }
 
 function setupScene() {
@@ -39,7 +44,7 @@ function setupScene() {
   scene.add(new THREE.AmbientLight(0xffffff, 1.1));
   const key = new THREE.DirectionalLight(0xffe0f0, 1.4); key.position.set(1, 2, 3); scene.add(key);
   const rim = new THREE.DirectionalLight(0xff5aa8, 0.9); rim.position.set(-2, 1.5, -1); scene.add(rim); // contre-jour rose
-  camera = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, 0.05, 30);
+  camera = new THREE.PerspectiveCamera(28, innerWidth / innerHeight, 0.05, 30); // réglée sur la taille du modèle au chargement
   clock = new THREE.Clock();
   addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); frame(); });
 }
@@ -51,7 +56,8 @@ function frame() {
   if (!vrm) return;
   vrm.scene.updateMatrixWorld(true);
   const head = boneY('head'), hips = boneY('hips'), foot = boneY('leftFoot');
-  const top = head.y + 0.16, bottom = cfg.frame === 'entiere' ? Math.min(foot.y, 0) - 0.05 : hips.y - 0.28;
+  const s = M ? M.s : 1;
+  const top = head.y + 0.16 * s, bottom = cfg.frame === 'entiere' ? Math.min(foot.y, 0) - 0.05 * s : hips.y - 0.28 * s;
   const h = top - bottom, cy = (top + bottom) / 2;
   const dist = (h / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.05;
   camera.position.set(0, cy + h * 0.02, dist);
@@ -76,7 +82,7 @@ function setSkin(naked) {
 // Groupes de vêtements : une étape = un type de pièce (toutes les parties de la robe partent ensemble)
 function groupWear(items) {
   const groups = [];
-  for (const it of items) { let g = groups.find(x => x.rank === it.rank); if (!g) groups.push(g = { rank: it.rank, meshes: [] }); g.meshes.push(it.mesh); }
+  for (const it of items) { let g = groups.find(x => x.rank === it.rank); if (!g) groups.push(g = { rank: it.rank, meshes: [] }); g.meshes.push(it.mesh || it.mat); }
   return groups.map(g => ({ mesh: { set visible(v) { g.meshes.forEach(m => { m.visible = v; }); } } }));
 }
 function stripMore(why) {
@@ -97,12 +103,13 @@ async function loadAnims(loader) {
     try {
       const buf = await (await fetch(chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/')))).arrayBuffer();
       const clip = VMD.parseVmd(buf); clip.name = f.split('/').pop();
+      if (vrm.isPmx) clip.pmxClip = await loadVmdFor(vrm, chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/'))); // lecture native
       (anims[sc] = anims[sc] || []).push({ vmd: clip });
     } catch (e) { post({ type: 'anim-error', file: f, error: String(e && e.message || e) }); }
   }
-  if (Object.values(anims).some(l => l.some(a => a.vmd))) { feetRest = VMD.restFeet(vrm, M); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') : 'vrma').join(',')) }); }
+  if (Object.values(anims).some(l => l.some(a => a.vmd))) { if (!vrm.isPmx) feetRest = VMD.restFeet(vrm, M); else pmxMixer = new THREE.AnimationMixer(vrm.mesh); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') : 'vrma').join(',')) }); }
   const files = all.filter(f => /\.vrma$/i.test(f));
-  if (!files.length) return;
+  if (!files.length || vrm.isPmx) return; // .vrma : modèles VRM seulement
   const l = new GLTFLoader(); l.register(p => new VRMAnimationLoaderPlugin(p));
   for (const f of files) {
     const sc = SCENE_OF(f); if (!sc) continue;
@@ -115,16 +122,28 @@ async function loadAnims(loader) {
   if (Object.values(anims).some(l => l.some(a => a.vrma))) mixer = new THREE.AnimationMixer(vrm.scene);
 }
 
+// Pose une image d'une animation MMD : native sur un modèle MMD, adaptée sur un VRM
+function poseVmd(clip, f) {
+  if (vrm.isPmx && clip.pmxClip) {
+    vrm.resetAll();
+    if (pmxPlaying !== clip) { pmxMixer.stopAllAction(); clip.action = clip.action || pmxMixer.clipAction(clip.pmxClip); clip.action.play(); pmxPlaying = clip; }
+    clip.action.time = (f / 30) % clip.pmxClip.duration; pmxMixer.update(0);
+    vrm.solve(true);                                   // IK des jambes + os automatiques
+    return null;                                        // les mimiques sont posées par l'animation elle-même
+  }
+  return VMD.applyVmd(vrm, M, clip, f, feetRest);
+}
+
 // Accessoire (sexe / gode) placé d'après le mouvement réel d'une animation MMD
 function vmdSpan(clip) { return Math.min(clip.frames, clip.cycle ? Math.round(clip.cycle * 30 * 2) : clip.frames); }
 function setupVmdProp(sc, clip) {
   if (clip.prop !== undefined) return clip.prop;
   const n = 24, span = vmdSpan(clip), pts = [], fwd = new THREE.Vector3();
   for (let i = 0; i < n; i++) {
-    VMD.applyVmd(vrm, M, clip, (i / n) * span, feetRest);
+    poseVmd(clip, (i / n) * span);
     if (sc === 'fellation') {
       pts.push(P.mouthPos(vrm, M).clone());
-      const h = P.bone(vrm, 'head'); fwd.add(new THREE.Vector3(0, 0, -1).transformDirection(h.matrixWorld));
+      const h = P.bone(vrm, 'head'); fwd.add(new THREE.Vector3(0, 0, vrm.noFlip ? 1 : -1).transformDirection(h.matrixWorld));
     } else pts.push(P.crotchPos(vrm, M).clone());
   }
   let prop = null;
@@ -175,12 +194,13 @@ const VIEW_DIR = {
 const fits = {};
 function poseScene(sc, d, t = 0) {
   const vm = (anims[sc] || []).find(a => a.vmd);
-  if (vm) { VMD.applyVmd(vrm, M, vm.vmd, d * vmdSpan(vm.vmd), feetRest); return; }
+  if (vm) { poseVmd(vm.vmd, d * vmdSpan(vm.vmd)); return; }
   if (sc === 'masturbation') P.poseMasturbation(vrm, M, d, t, 1);
   else if (sc === 'fellation') P.poseFellation(vrm, M, F, d, t, 1, false);
   else if (sc === 'chevauche') P.poseRiding(vrm, M, R, d, t, 1);
   else if (sc === 'twerk') P.poseTwerk(vrm, M, d, t, 1);
   else { P.resetPose(vrm, M); restPose(); }
+  if (vrm.isPmx && !vm) vrm.solve(false);
   vrm.scene.updateMatrixWorld(true);
 }
 function computeFit(sc) {
@@ -213,7 +233,7 @@ function fitCamera(sc) {
 
 function switchScene(sc) {
   if (sc === st.scene) return;
-  st.scene = sc; st.sceneSince = performance.now();
+  st.scene = sc; st.sceneSince = performance.now(); resetPhys = true;
   if (sc !== 'danse' && cfg.nude !== 'habillee' && !naked()) { st.stage = wear.length; applyWear(); } // elle se met nue pour ça
   const vlist = (anims[sc] || []).filter(a => a.vmd);
   vmdCur = vlist.length ? vlist[Math.floor(Math.random() * vlist.length)].vmd : null; vmdTime = 0;
@@ -242,6 +262,7 @@ async function load() {
   setupScene();
   const path = await findModel();
   if (!path) { post({ type: 'ready', ok: false }); return; }
+  if (/\.pmx$/i.test(path)) return loadPmxModel(path);
   const loader = new GLTFLoader();
   loader.register(p => new VRMLoaderPlugin(p));
   const url = chrome.runtime.getURL(path.split('/').map(encodeURIComponent).join('/'));
@@ -280,8 +301,30 @@ async function load() {
   requestAnimationFrame(loop);
 }
 
+// ---------- Modèle MMD (.pmx) ----------
+async function loadPmxModel(path) {
+  // physique (cheveux, seins…) : moteur Ammo, chargé si possible
+  try { if (typeof Ammo === 'function') globalThis.Ammo = await Ammo(); } catch (e) {}
+  const url = chrome.runtime.getURL(path.split('/').map(encodeURIComponent).join('/'));
+  vrm = await loadPmx(url, !!globalThis.Ammo && typeof globalThis.Ammo !== 'function');
+  scene.add(vrm.mesh);
+  M = P.measure(vrm);
+  camera.near = 0.03 * M.s; camera.far = 80 * M.s; camera.updateProjectionMatrix();
+  wear = groupWear(vrm.clothes());
+  licenceOk = true; // pas de licence lisible dans un .pmx : c'est à toi de vérifier celle du modèle
+  loadAnims(null).catch(e => post({ type: 'anim-error', file: 'animations', error: String(e && e.message || e) }));
+  P.resetPose(vrm, M); vrm.solve(false);
+  applyWear();
+  const r = P.poseMasturbation(vrm, M, 0.5, 0, 1) || {};
+  P.resetPose(vrm, M); vrm.solve(false); vrm.resetPhysics();
+  post({ type: 'ready', ok: true, name: vrm.meta.name || path.split('/').pop(), author: '', wear: wear.length, nude: true, licence: { format: 'pmx', note: 'licence non lisible dans un .pmx : vérifie-la toi-même' },
+    report: { format: 'MMD (.pmx)', physique: vrm.physics, vetements: vrm.clothes().map(c => c.name), osTrouves: Object.keys(vrm.humanoid.humanBones).length, ecartMainSexeCm: r.sexe != null ? Math.round(r.sexe / M.s * 160) : null, ecartMainSeinCm: r.sein != null ? Math.round(r.sein / M.s * 160) : null } });
+  requestAnimationFrame(loop);
+}
+
 // ---------- Pose et animation ----------
 function restPose() {
+  if (vrm && vrm.isPmx) return; // un modèle MMD est déjà au repos bras le long du corps (pose A)
   const set = (n, x, y, z) => { const b = B(n); if (b) b.rotation.set(x, y, z); };
   set('leftUpperArm', 0, 0, 1.15); set('rightUpperArm', 0, 0, -1.15);
   set('leftLowerArm', 0, -0.25, 0); set('rightLowerArm', 0, 0.25, 0);
@@ -321,6 +364,7 @@ function step() {
   const stroke = Math.sin(ph * Math.PI * 2) * amp;      // va-et-vient calé sur le beat
 
   const now = performance.now();
+  if (vrm.isPmx) vrm.clearExpr();
   const want = wantedScene(now);
   if (want !== st.scene && now - st.sceneSince > 8000) switchScene(want); // pas plus d'un changement toutes les 8 s
   const intensity = st.mood === 'fast' || st.mood === 'faster' ? 1 : st.mood === 'medium' ? 0.7 : 0.45;
@@ -333,8 +377,8 @@ function step() {
     if (active && vmdCur.cycle) { const beat = st.period / 1000, k = Math.max(1, Math.round(vmdCur.cycle / beat)); rate = Math.max(0.4, Math.min(2.5, vmdCur.cycle / (k * beat))); }
     else if (!active) rate = 0.35;
     vmdTime += dt * rate;
-    vmdFace = VMD.applyVmd(vrm, M, vmdCur, (vmdTime * 30) % vmdCur.frames, feetRest);
-  } else if (mixer && clips && clips.length) {
+    vmdFace = poseVmd(vmdCur, (vmdTime * 30) % vmdCur.frames);
+  } else if (mixer && clips && clips.length && !vrm.isPmx) {
     // animation d'artiste : on la joue, à une vitesse calée sur le tempo
     if (actionScene !== st.scene) { action = mixer.clipAction(clips[Math.floor(Math.random() * clips.length)]); action.reset().fadeIn(0.3).play(); actionScene = st.scene; }
     const clipDur = action.getClip().duration;
@@ -351,23 +395,24 @@ function step() {
   } else {
     P.resetPose(vrm, M); restPose();
     const hips = B('hips'), spine = B('spine'), chest = B('chest') || B('upperChest'), neck = B('neck'), head = B('head');
-    const breathe = Math.sin(t * 1.6) * 0.02;
-    if (hips) { hips.rotation.x = -0.10 * st.e * amp + 0.04 * stroke; hips.rotation.y = Math.sin(t * 0.7) * 0.05; hips.rotation.z = Math.sin(t * 0.9) * 0.04 * amp; hips.position.y = M.hipsRest.y - 0.025 * st.e * amp; }
-    if (spine) spine.rotation.x = 0.06 * st.e * amp + breathe;
-    if (chest) chest.rotation.x = 0.04 * st.e * amp - breathe * 0.5;
-    if (neck) neck.rotation.x = -0.03 * st.e * amp;
-    if (head) { head.rotation.z = Math.sin(t * 0.5) * 0.06; head.rotation.x = 0.04 * Math.sin(t * 0.8); }
+    const breathe = Math.sin(t * 1.6) * 0.02, fl = vrm.noFlip ? -1 : 1; // sens des axes selon le type de modèle
+    if (hips) { hips.rotation.x = fl * (-0.10 * st.e * amp + 0.04 * stroke); hips.rotation.y = Math.sin(t * 0.7) * 0.05; hips.rotation.z = fl * Math.sin(t * 0.9) * 0.04 * amp; hips.position.y = M.hipsRest.y - 0.025 * M.s * st.e * amp; }
+    if (spine) spine.rotation.x = fl * (0.06 * st.e * amp + breathe);
+    if (chest) chest.rotation.x = fl * (0.04 * st.e * amp - breathe * 0.5);
+    if (neck) neck.rotation.x = fl * -0.03 * st.e * amp;
+    if (head) { head.rotation.z = fl * Math.sin(t * 0.5) * 0.06; head.rotation.x = fl * 0.04 * Math.sin(t * 0.8); }
     // bras droit : geste de va-et-vient (comme si elle te branlait) quand ça tourne
     const ru = B('rightUpperArm'), rl = B('rightLowerArm'), rh = B('rightHand');
-    if (ru && rl) {
+    if (ru && rl && !vrm.isPmx) {
       const k = active && st.state !== 'edge' ? 1 : 0;
       ru.rotation.set(-0.55 * k + 0.12 * stroke * k, 0.25 * k, -1.15 + 0.55 * k);
       rl.rotation.set(0, 0.25 + 1.2 * k + 0.35 * stroke * k, 0);
       if (rh) rh.rotation.set(0, 0, 0.3 * k);
     }
     const lu = B('leftUpperArm');
-    if (lu) lu.rotation.set(0, 0, 1.15 - 0.08 * Math.sin(t * 1.1));
+    if (lu && !vrm.isPmx) lu.rotation.set(0, 0, 1.15 - 0.08 * Math.sin(t * 1.1));
   }
+  if (vrm.isPmx && !vmdCur) vrm.solve(false); // os automatiques après une pose calculée
   fitCamera(st.scene);
 
   // expressions + clignements + bouche quand elle parle
@@ -382,9 +427,16 @@ function step() {
     const s = Math.abs(Math.sin(t * 13)) * 0.6 + Math.abs(Math.sin(t * 7.3)) * 0.3;
     target.aa = Math.max(target.aa, s * 0.7); target.oh = Math.max(target.oh, (1 - s) * 0.3);
   }
-  const em = vrm.expressionManager;
-  if (em) EXP.forEach(k => { cur[k] += (target[k] - cur[k]) * Math.min(1, dt * (k === 'blink' ? 30 : 10)); try { em.setValue(k, cur[k]); } catch (e) {} });
-  vrm.update(dt);
+  EXP.forEach(k => { cur[k] += (target[k] - cur[k]) * Math.min(1, dt * (k === 'blink' ? 30 : 10)); });
+  if (vrm.isPmx) {
+    EXP.forEach(k => vrm.setExpr(k, cur[k]));
+    if (resetPhys) { vrm.resetPhysics(); resetPhys = false; }
+    vrm.physicsStep(dt);                                // cheveux, seins…
+  } else {
+    const em = vrm.expressionManager;
+    if (em) EXP.forEach(k => { try { em.setValue(k, cur[k]); } catch (e) {} });
+    vrm.update(dt);
+  }
   renderer.render(scene, camera);
 }
 

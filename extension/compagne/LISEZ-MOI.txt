@@ -4,3 +4,5 @@ Bibliothèques 3D embarquées (licence MIT, voir les fichiers LICENSE-*.txt) :
 Les imports "three" ont été remplacés par des chemins relatifs pour fonctionner dans l'extension.
 - @pixiv/three-vrm-animation 2.1.0 (https://github.com/pixiv/three-vrm), même licence MIT
 - lib/mmdparser.module.js : lecteur de fichiers MMD fourni avec three.js 0.160.0 (licence MIT)
+- lib/MMDLoader.js, MMDToonShader.js, TGALoader.js, MMDAnimationHelper.js, CCDIKSolver.js, MMDPhysics.js : three.js 0.160.0 (MIT)
+- lib/ammo.wasm.js + ammo.wasm.wasm : Ammo.js (moteur physique Bullet, licence zlib), fourni avec three.js

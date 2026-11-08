@@ -1,10 +1,18 @@
-Dépose ici ton modèle 3D au format .vrm (un seul suffit ; s'il y en a plusieurs, le premier est pris).
+Dépose ici ta compagne 3D. Deux formats :
 
-- VRoid Hub (https://hub.vroid.com) : choisis un modèle dont la licence indique
-  « Expression sexuelle : autorisée » et dont le personnage est clairement ADULTE.
-- Ou crée le tien avec VRoid Studio (gratuit) : il t'appartient.
+1) VRM (.vrm) — par ex. VRoid Hub
+   Choisis un modèle dont la licence indique « Expression sexuelle : autorisée ».
+   GoonFap retire les vêtements et prépare une peau nue tout seul.
 
+2) MMD (.pmx) — mets le DOSSIER COMPLET du modèle :
+     modele/HIME/HIME.pmx
+     modele/HIME/tex/…   modele/HIME/sp/…   modele/HIME/toon/…
+   Sans ses textures, le modèle est invisible ou gris.
+   Les animations .vmd se jouent nativement dessus, avec la physique (cheveux, seins).
+   Le strip-tease retire les vêtements qui sont des pièces séparées du corps.
+   Un .pmx ne contient pas de licence lisible : vérifie-la toi-même (readme du modèle).
+
+Le personnage doit être clairement ADULTE.
+S'il y a plusieurs modèles, choisis lequel dans le popup (rubrique 💃).
 Ensuite : chrome://extensions → « Recharger » sur GoonFap.
-
-GoonFap retire les vêtements et prépare une peau nue tout seul, en mémoire :
-ton fichier n'est jamais modifié. Pense à créditer l'auteur si tu publies quoi que ce soit.
+Ce dossier n'est jamais envoyé sur GitHub.

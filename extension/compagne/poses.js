@@ -11,8 +11,12 @@ const _q = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _a = V(), _b = 
 export function bone(vrm, n) { return vrm.humanoid.getNormalizedBoneNode(n); }
 // Les angles sont écrits « vus du monde » (le modèle regarde vers +Z) : x>0 = pencher vers l'avant / vers le bas,
 // z>0 = vers sa gauche. Les os normalisés d'un VRM 0 sont tournés de 180° : on inverse x et z.
-export function setW(vrm, n, x, y, z) { const b = bone(vrm, n); if (b) b.rotation.set(-x, y, -z); }
-export function addW(vrm, n, x, y, z) { const b = bone(vrm, n); if (b) { b.rotation.x -= x; b.rotation.y += y; b.rotation.z -= z; } }
+// (les modèles MMD, eux, ont des os dans le repère du monde : vrm.noFlip)
+export function setW(vrm, n, x, y, z) { const b = bone(vrm, n); if (b) { if (vrm.noFlip) b.rotation.set(x, y, z); else b.rotation.set(-x, y, -z); } }
+export function addW(vrm, n, x, y, z) { const b = bone(vrm, n); if (b) { const k = vrm.noFlip ? 1 : -1; b.rotation.x += k * x; b.rotation.y += y; b.rotation.z += k * z; } }
+// position de référence du bassin (VRM : l'os hips ; MMD : 下半身, car la « センター » est plus bas)
+export function hipPos(vrm, out = V()) { return wpos(bone(vrm, 'hipsPos') || bone(vrm, 'hips'), out); }
+const FWD = vrm => (vrm.noFlip ? 1 : -1); // signe de « devant » dans le repère local des os
 export function wpos(node, out = V()) { node.updateWorldMatrix(true, false); return node.getWorldPosition(out); }
 
 /** Mesures du modèle, prises une fois au repos. */
@@ -27,6 +31,7 @@ export function measure(vrm) {
 
 /** Remet toutes les articulations au repos. */
 export function resetPose(vrm, M) {
+  if (vrm.resetAll) vrm.resetAll(); // modèle MMD : toute la pose de repos (os automatiques compris)
   for (const n of Object.keys(vrm.humanoid.humanBones)) { const b = bone(vrm, n); if (b) b.quaternion.identity(); }
   bone(vrm, 'hips').position.copy(M.hipsRest);
 }
@@ -57,7 +62,7 @@ export function reach(vrm, side, target, fingerDir, palmDir) {
   const tip = bone(vrm, s + 'MiddleIntermediate') || bone(vrm, s + 'MiddleProximal');
   // coude légèrement plié pour que l'IK garde un pli naturel
   la.rotation.set(0, s === 'left' ? -0.6 : 0.6, 0);
-  ua.rotation.set(0, 0, s === 'left' ? 1.0 : -1.0);
+  setW(vrm, s + 'UpperArm', 0, 0, s === 'left' ? -1.0 : 1.0);
   h.quaternion.identity();
   vrm.scene.updateMatrixWorld(true);
   let wristTarget = target;
@@ -125,7 +130,7 @@ export function poseMasturbation(vrm, M, d, t, intensity) {
   set('neck', -0.05, 0, 0);
   set('head', -0.12 - 0.25 * intensity * d, Math.sin(t * 0.6) * 0.15, Math.sin(t * 0.8) * 0.08); // tête en arrière quand c'est fort
   vrm.scene.updateMatrixWorld(true);
-  const s = M.s, hp = wpos(hips, V());
+  const s = M.s, hp = hipPos(vrm);
   // main droite entre les cuisses : va-et-vient
   // haut du sexe (clitoris) : atteignable même avec des bras de personnage anime
   const crotch = new THREE.Vector3(-0.005 * s, hp.y - 0.068 * s, hp.z + 0.085 * s);
@@ -153,7 +158,7 @@ function fellationBody(vrm, M, d) {
 export function mouthPos(vrm, M, out = V()) {
   const h = bone(vrm, 'head');
   h.updateWorldMatrix(true, false);
-  return out.set(0, -0.005 * M.s, -0.082 * M.s).applyMatrix4(h.matrixWorld); // -z local = devant le visage
+  return out.set(0, -0.005 * M.s, FWD(vrm) * 0.082 * M.s).applyMatrix4(h.matrixWorld); // devant le visage
 }
 
 /** Prépare la scène fellation : trajectoire de la bouche et sexe masculin aligné dessus. */
@@ -192,7 +197,7 @@ export function poseFellation(vrm, M, F, d, t, intensity, handOnShaft) {
   addW(vrm, 'head', 0, Math.sin(t * 1.3) * 0.04, Math.sin(t * 0.9) * 0.05);
   vrm.scene.updateMatrixWorld(true);
   // main droite : sur la cuisse, ou qui branle la base quand ça va vite (elle suit sa bouche)
-  const hp = wpos(bone(vrm, 'hips'), V());
+  const hp = hipPos(vrm);
   if (handOnShaft && F) {
     const grip = F.base.clone().lerp(F.tip, 0.25 + 0.3 * d);
     reach(vrm, 'right', grip, new THREE.Vector3(-0.6, 0.2, -0.2), F.axis.clone().negate().cross(new THREE.Vector3(0, 1, 0)).add(new THREE.Vector3(0.3, 0, 0)));
@@ -214,8 +219,8 @@ function ridingBody(vrm, M, d) {
   vrm.scene.updateMatrixWorld(true);
 }
 function crotchPos(vrm, M, out = V()) {
-  const h = bone(vrm, 'hips'); h.updateWorldMatrix(true, false);
-  return out.set(0, -0.085 * M.s, -0.045 * M.s).applyMatrix4(h.matrixWorld); // sous le bassin (z local inversé : -z = devant)
+  const h = bone(vrm, 'hipsPos') || bone(vrm, 'hips'); h.updateWorldMatrix(true, false);
+  return out.set(0, -0.085 * M.s, FWD(vrm) * 0.045 * M.s).applyMatrix4(h.matrixWorld); // sous le bassin, un peu devant
 }
 export function setupRiding(vrm, M, scene) {
   ridingBody(vrm, M, 0); const c0 = crotchPos(vrm, M).clone();
@@ -248,7 +253,7 @@ export function poseRiding(vrm, M, R, d, t, intensity) {
   ridingBody(vrm, M, d);
   addW(vrm, 'hips', 0, Math.sin(t * 0.8) * 0.05, 0); // petit roulement des hanches
   vrm.scene.updateMatrixWorld(true);
-  const hp = wpos(bone(vrm, 'hips'), V());
+  const hp = hipPos(vrm);
   // mains posées à plat sur le haut des cuisses, devant elle
   reach(vrm, 'right', new THREE.Vector3(-0.12 * M.s, hp.y - 0.06 * M.s, hp.z + 0.16 * M.s), new THREE.Vector3(0, -0.4, 1), new THREE.Vector3(0, -1, 0));
   reach(vrm, 'left', new THREE.Vector3(0.12 * M.s, hp.y - 0.06 * M.s, hp.z + 0.16 * M.s), new THREE.Vector3(0, -0.4, 1), new THREE.Vector3(0, -1, 0));
@@ -298,13 +303,13 @@ export function cameraFor(scene, view, vrm, M, F, cam) {
     return;
   }
   if (scene === 'twerk') {
-    const hp = wpos(bone(vrm, 'hips'), V());
+    const hp = hipPos(vrm);
     if (view === 'cote') { cam.position.set(1.3 * s, hp.y + 0.15 * s, -0.35 * s); cam.lookAt(0, hp.y + 0.05 * s, 0); }
     else { cam.position.set(0.3 * s, hp.y + 0.1 * s, -1.75 * s); cam.lookAt(0, hp.y + 0.2 * s, 0.1 * s); } // de dos
     return;
   }
   if (scene === 'masturbation') {
-    const hp = wpos(bone(vrm, 'hips'), V());
+    const hp = hipPos(vrm);
     if (view === 'cote') { cam.position.set(0.95 * s, hp.y + 0.35 * s, 1.0 * s); cam.lookAt(0, hp.y + 0.12 * s, 0); }
     else { cam.position.set(0, hp.y + 0.62 * s, 1.75 * s); cam.lookAt(0, hp.y + 0.2 * s, 0); }
   }

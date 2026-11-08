@@ -140,6 +140,14 @@ Une animation `.vmd` ne contient que du mouvement : elle s'applique à **ton** m
 GoonFap retire les vêtements et prépare une **peau nue** tout seul, en mémoire, sans modifier ton fichier : il efface ce qui est peint sur la peau (collants, culotte) et dessine aréoles, tétons et sexe aux bons endroits.
 Le bouton **💃** du panneau l'affiche ou la cache. Tenue, cadrage (buste / en entier), côté et taille se règlent dans le popup.
 
+**Modèles MMD (`.pmx`) aussi :** mets le **dossier complet** du modèle (le `.pmx` et ses dossiers de textures) dans `extension/modele/`, puis choisis-le dans le popup.
+
+- Les animations `.vmd` se jouent **nativement** dessus, avec la cinématique inverse des jambes et la **physique** (cheveux, seins).
+- Les animations calculées par GoonFap (masturbation, fellation, chevauche, twerk) marchent aussi, grâce aux os MMD standard.
+- Le strip-tease retire les vêtements qui sont des pièces séparées du corps.
+
+Un `.pmx` ne contient pas de licence lisible : vérifie-la toi-même.
+
 **Licence du modèle :** sur VRoid Hub, prends un modèle dont la licence indique **« Expression sexuelle : autorisée »** et dont le personnage est **clairement adulte**. Crédite l'auteur si tu publies quoi que ce soit. Ou crée le tien avec VRoid Studio (gratuit).
 Le dossier `modele/` est ignoré par git : ton modèle reste chez toi.
 

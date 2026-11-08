@@ -8,6 +8,7 @@ var GF = globalThis.GF || (globalThis.GF = (() => {
     compFrame: 'entiere',// 'buste' | 'entiere'
     compSide: 'gauche',// 'gauche' | 'droite'
     compSize: 0.6,     // hauteur (fraction de l'écran)
+    compModel: '',     // fichier du modèle dans modele/ ('' = le premier trouvé)
     compScene: 'auto', // 'auto' | 'danse' | 'masturbation' | 'fellation' | 'chevauche' | 'twerk'
     compView: 'pov',   // 'pov' (vue subjective) | 'cote'
     cover: true,       // plein écran : l'image remplit l'écran (plus de bandes noires, bords rognés)
