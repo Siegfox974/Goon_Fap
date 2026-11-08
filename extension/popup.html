@@ -103,6 +103,26 @@
     </details>
 
     <details>
+      <summary>💃 Compagne 3D (dossier modele/)</summary>
+      <p id="comp-info" class="small"></p>
+      <label class="check"><input type="checkbox" id="compagne"> Afficher ta compagne par-dessus la vidéo</label>
+      <label>Tenue
+        <select id="compNude">
+          <option value="strip">Strip-tease : elle se déshabille pendant la séance</option>
+          <option value="nue">Nue dès le début</option>
+          <option value="habillee">Habillée</option>
+        </select>
+      </label>
+      <label>Cadrage
+        <select id="compFrame"><option value="buste">Buste</option><option value="entiere">En entier</option></select>
+      </label>
+      <label>Côté
+        <select id="compSide"><option value="gauche">À gauche</option><option value="droite">À droite</option></select>
+      </label>
+      <label>Taille <output data-for="compSize"></output><input type="range" id="compSize" min="0.3" max="1" step="0.05"></label>
+    </details>
+
+    <details>
       <summary>🖼 GIF (dossier gifs/)</summary>
       <p id="gif-count" class="small"></p>
       <label class="check"><input type="checkbox" id="gifs"> Afficher des GIF par-dessus la vidéo</label>

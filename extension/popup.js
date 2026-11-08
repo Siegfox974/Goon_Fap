@@ -1,11 +1,11 @@
 'use strict';
 const $ = s => document.querySelector(s);
-const FIELDS = ['cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
+const FIELDS = ['compagne', 'compNude', 'compFrame', 'compSide', 'compSize', 'cumSnd', 'fMode', 'fOffset', 'finale', 'beatKind', 'source', 'power', 'pulse', 'vOffset', 'vTol', 'tease', 'tempoBoost', 'level', 'anatomy', 'talk', 'voice', 'voiceName',
   'voiceRate', 'voicePitch', 'clips', 'moans', 'clipVol', 'beatSfx', 'beatVol', 'gifs', 'gifEvery', 'gifDur', 'gifSize',
   'sens', 'band', 'minGap', 'predict', 'offset'];
-const NUM = new Set(['fOffset', 'power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
+const NUM = new Set(['compSize', 'fOffset', 'power', 'pulse', 'vOffset', 'vTol', 'talk', 'voiceRate', 'voicePitch', 'clipVol', 'beatVol', 'gifEvery', 'gifDur', 'gifSize', 'sens', 'minGap', 'offset']);
 const pct = v => Math.round(v * 100) + '%';
-const FMT = { fOffset: v => v + ' ms', power: pct, pulse: v => v + ' ms', vOffset: v => v + ' ms', vTol: v => v, voiceRate: v => (+v).toFixed(2), voicePitch: v => (+v).toFixed(2),
+const FMT = { compSize: v => Math.round(v * 100) + '%', fOffset: v => v + ' ms', power: pct, pulse: v => v + ' ms', vOffset: v => v + ' ms', vTol: v => v, voiceRate: v => (+v).toFixed(2), voicePitch: v => (+v).toFixed(2),
   clipVol: pct, beatVol: pct, gifEvery: v => v + ' s', gifDur: v => v + ' s', gifSize: pct, sens: v => (+v).toFixed(1), minGap: v => v + ' ms', offset: v => v + ' ms' };
 let S = Object.assign({}, GF.DEFAULTS);
 
@@ -97,6 +97,8 @@ function renderSoundList(files) {
 const LABELS = { fap: 'fap', lent: 'gémissements doux', moyen: 'gémissements', rapide: 'gros gémissements', beat: 'claquements', oral: 'bouche', jouis: 'orgasmes féminins',
   debut: 'début', taquin: 'taquin', stop: 'stop', reprise: 'reprise', bord: 'au bord' };
 async function counts() {
+  const mods = (await listDir('modele')).filter(f => /\.vrm$/i.test(f));
+  $('#comp-info').textContent = mods.length ? `Modèle : ${mods[0].split('/').pop()}` : 'Aucun modèle : dépose un fichier .vrm dans le dossier modele/ de l\'extension, puis recharge-la.';
   const g = await listDir('gifs');
   $('#gif-count').textContent = g.length ? `${g.length} fichier(s) dans gifs/.` : 'Aucun GIF : dépose tes .gif / .webp / .mp4 dans le dossier gifs/ de l\'extension, puis recharge-la.';
   const s = await GF.indexSounds();

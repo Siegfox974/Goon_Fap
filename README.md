@@ -106,6 +106,21 @@ Le diagnostic 🩺 contient le journal des entrées et sorties de plein écran.
 
 Avec le plein écran natif de la vidéo (double-clic sur certaines vidéos), les messages et GIF s'affichent, mais Chrome empêche de cliquer sur le panneau. Si un site bloque tout, **F11** marche toujours.
 
+### Ta compagne 3D : dossier `extension/modele/`
+
+Dépose un modèle **VRM** (`.vrm`) dans `extension/modele/`, puis recharge l'extension. Elle apparaît dans un coin, par-dessus la vidéo :
+
+- elle **bouge au rythme** : coups de hanches sur chaque beat, geste de va-et-vient avec la main, plus ample quand ça accélère ;
+- **elle te regarde**, cligne des yeux, et **bouge les lèvres** quand elle parle ;
+- ses expressions suivent le moment : douce, puis excitée, moue taquine aux STOP et au bord, visage d'orgasme à la fin ;
+- **strip-tease** (par défaut) : elle enlève une pièce à chaque fois que tu es au bord, à chaque reprise après une pause, et toutes les ~3 minutes. Elle est entièrement nue pour le final.
+
+GoonFap retire les vêtements et prépare une **peau nue** tout seul, en mémoire, sans modifier ton fichier : il efface ce qui est peint sur la peau (collants, culotte) et dessine aréoles, tétons et sexe aux bons endroits.
+Le bouton **💃** du panneau l'affiche ou la cache. Tenue, cadrage (buste / en entier), côté et taille se règlent dans le popup.
+
+**Licence du modèle :** sur VRoid Hub, prends un modèle dont la licence indique **« Expression sexuelle : autorisée »** et dont le personnage est **clairement adulte**. Crédite l'auteur si tu publies quoi que ce soit. Ou crée le tien avec VRoid Studio (gratuit).
+Le dossier `modele/` est ignoré par git : ton modèle reste chez toi.
+
 ### Tes GIF : dossier `extension/gifs/`
 
 Dépose tes `.gif`, `.webp`, `.png`, `.jpg`, `.mp4` ou `.webm` dans `extension/gifs/` et recharge l'extension. Les sous-dossiers marchent aussi.
@@ -149,7 +164,7 @@ Une bonne source est l'[OpenNSFW Sound Pack](https://opennsfw.carrd.co/), gratui
 - le **SFX Pack** contient les claquements, la bouche et les orgasmes ;
 - les **gémissements** sont dans les packs de voix (*MoanPack*, *VoicePack*) du même site.
 
-Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/` et `sons/` sont ignorés par git.
+Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/`, `sons/` et `modele/` sont ignorés par git.
 
 ## L'application web (vidéos sur ton PC, programmes générés)
 

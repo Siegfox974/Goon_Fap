@@ -3,6 +3,11 @@
 var GF = globalThis.GF || (globalThis.GF = (() => {
   const DEFAULTS = {
     _v: 6,
+    compagne: true,    // personnage 3D (dossier modele/) par-dessus la vidéo
+    compNude: 'strip', // 'strip' (se déshabille pendant la séance) | 'nue' | 'habillee'
+    compFrame: 'buste',// 'buste' | 'entiere'
+    compSide: 'gauche',// 'gauche' | 'droite'
+    compSize: 0.6,     // hauteur (fraction de l'écran)
     cover: true,       // plein écran : l'image remplit l'écran (plus de bandes noires, bords rognés)
     power: 1,          // 100 % = le max de la manette
     pulse: 140,        // ms par vibration

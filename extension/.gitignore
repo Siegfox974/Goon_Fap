@@ -5,3 +5,5 @@ sons/**/*
 !sons/*/
 !sons/LISEZ-MOI.txt
 !sons/*/.gitkeep
+modele/*
+!modele/LISEZ-MOI.txt

@@ -81,6 +81,7 @@
   * { box-sizing: border-box; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   .vignette { position: fixed; inset: 0; pointer-events: none; opacity: 0;
     box-shadow: inset 0 0 120px 30px rgba(255,61,154,.85), inset 0 0 260px 60px rgba(155,92,255,.35); }
+  .compagne { position: fixed; bottom: 0; border: 0; pointer-events: none; background: transparent; color-scheme: normal; transition: opacity .6s; }
   .gifs { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; background: transparent; color-scheme: normal; }
   .msg { position: fixed; left: 50%; top: 34%; transform: translate(-50%,-50%) scale(.96); width: min(92vw, 1000px);
     text-align: center; color: #fff; font-weight: 900; font-size: clamp(26px, 4.6vw, 60px); line-height: 1.15;
@@ -126,6 +127,7 @@
   .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 4px; vertical-align: middle; border: 1px solid #fff; margin-left: 6px; }
 </style>
 <div class="vignette"></div>
+<iframe class="compagne hidden" allowtransparency="true"></iframe>
 <iframe class="gifs" allowtransparency="true"></iframe>
 <div class="msg"></div>
 <canvas class="track"></canvas>
@@ -163,6 +165,7 @@
       <button data-a="track" title="Afficher / masquer la piste">👁</button>
       <button data-a="voice" title="Voix on/off">🔊</button>
       <button data-a="gifs" title="GIF on/off">🖼</button>
+      <button data-a="compagne" title="Ta compagne 3D on/off (modèle .vrm dans le dossier modele/)">💃</button>
     </div>
     <div class="row">
       <button data-a="edge" class="hot">🥵 Au bord !</button>
@@ -175,6 +178,35 @@
   const panel = $('.panel'), msgEl = $('.msg'), vignette = $('.vignette'), canvas = $('canvas.track'), cx = canvas.getContext('2d');
   const prev = $('canvas.prev'), px = prev.getContext('2d'), gifFrame = $('iframe.gifs');
   gifFrame.src = chrome.runtime.getURL('gifview.html');
+
+  // ---------- Compagne 3D ----------
+  const compFrame = root.querySelector('iframe.compagne');
+  const comp = { ready: false, ok: false, name: '', author: '' };
+  compFrame.src = chrome.runtime.getURL('compagne/compagne.html');
+  const toComp = m => { if (comp.ok && compFrame.contentWindow) compFrame.contentWindow.postMessage(Object.assign({ gf: 'c' }, m), '*'); };
+  function placeComp() {
+    const show = comp.ok && S.compagne;
+    compFrame.classList.toggle('hidden', !show);
+    if (!show) return;
+    const h = Math.round(innerHeight * S.compSize), w = Math.round(h * (S.compFrame === 'entiere' ? 0.5 : 0.75));
+    let bottom = 0;
+    if (src() === 'visual' && laneNow) bottom = Math.max(0, innerHeight - laneNow.y + 8); // jamais sur la barre rythmo
+    Object.assign(compFrame.style, { width: w + 'px', height: h + 'px', bottom: bottom + 'px', left: S.compSide === 'droite' ? 'auto' : '0', right: S.compSide === 'droite' ? '0' : 'auto' });
+  }
+  function compCfg(reset) { toComp({ type: 'cfg', cfg: { nude: S.compNude, frame: S.compFrame }, reset }); placeComp(); }
+  const STRIP_LINES = ['Tu veux voir la suite ? Mmh… 😈', 'Regarde bien… je l\'enlève pour toi.', 'Ça te plaît ? Branle-toi en me regardant.', 'Encore un peu plus nue pour toi…'];
+  window.addEventListener('message', e => {
+    if (e.source !== compFrame.contentWindow || !e.data || e.data.gf !== 'compagne') return;
+    const m = e.data;
+    if (m.type === 'ready') {
+      comp.ready = true; comp.ok = !!m.ok; comp.name = m.name || ''; comp.author = m.author || '';
+      if (m.ok) { compCfg(true); }
+      placeComp();
+    } else if (m.type === 'stripped' && S.talk > 0) {
+      message(m.stage >= m.total ? 'Voilà… toute nue rien que pour toi 💦' : STRIP_LINES[Math.floor(Math.random() * STRIP_LINES.length)], 3000);
+    }
+  });
+  addEventListener('resize', placeComp);
   document.documentElement.appendChild(host);
   raise();
 
@@ -187,6 +219,7 @@
     msgEl.classList.add('show');
     clearTimeout(msgTimer);
     msgTimer = setTimeout(() => msgEl.classList.remove('show'), ms);
+    if (opts.speak !== false) toComp({ type: 'talk', ms: text.replace(/<[^>]+>/g, '').length * 70 });
     if (S.voice && opts.speak !== false) {
       chrome.runtime.sendMessage({ type: 'gf-say', text: text.replace(/<small>.*<\/small>/, ''), opts: { voiceName: S.voiceName, rate: S.voiceRate, pitch: S.voicePitch } }).catch(() => {});
     }
@@ -228,6 +261,7 @@
   const silenceLimit = () => Math.max(2500, st.iv.length ? median(st.iv) * 2.5 : 0);
 
   function vibrate(s, now) {
+    toComp({ type: 'beat', s: S.nuance ? s : 1 });
     if (now < st.muteUntil) return false;
     // anti-doublon : jamais deux vibrations trop rapprochées
     const recent = st.iv.slice(-3);
@@ -264,6 +298,7 @@
       if (st.locked) st.period = m;
     } else st.locked = false;
     if (st.inPause) {
+      toComp({ type: 'state', state: 'resume' });
       st.inPause = false;
       stopTease();
       if (S.talk > 0) talk('resume', 2500);
@@ -272,7 +307,7 @@
     const bpm = currentBpm();
     if (bpm) setMood(GF.kindForBpm(bpm));
   }
-  function setMood(kind) { if (kind !== st.mood) { st.mood = kind; send({ type: 'mood', kind }); } }
+  function setMood(kind) { if (kind !== st.mood) { st.mood = kind; send({ type: 'mood', kind }); toComp({ type: 'mood', kind }); } }
 
   // ----- Source "son" : chaque attaque sonore -----
   function onOnset(s, at) {
@@ -538,7 +573,7 @@
       // Pause DANS la vidéo (beats arrêtés alors qu'elle tourne) → STOP. Si c'est toi qui as mis pause, ou si c'est la fin : rien.
       const vp = mainVideo();
       const userStopped = (vp && (vp.paused || vp.ended)) || dir.done;
-      if (!userStopped) { talk('pause', 3500); startTease(); }
+      if (!userStopped) { talk('pause', 3500); startTease(); toComp({ type: 'state', state: 'pause' }); }
       setMood('pause');
       st.nextTalk = now + 9000;
     }
@@ -548,6 +583,9 @@
     if (active) { if (!st.activeSince) st.activeSince = now; } else st.activeSince = 0;
 
     director(now, bpm, active);
+    // strip-tease : une pièce de plus toutes les ~3 minutes de séance active
+    if (active) { st.activeMs = (st.activeMs || 0) + 200; if (st.activeMs >= 180000) { st.activeMs = 0; toComp({ type: 'strip', why: 'temps' }); } }
+    if (comp.ok && src() === 'visual') placeComp();
 
     if (S.talk > 0 && now >= st.nextTalk && now >= st.muteUntil && !calib && !dir.countdown) {
       let kind = null;
@@ -594,7 +632,7 @@
     const rem = v.duration - v.currentTime;
     if (rem > 100) { dir.finalSaid = dir.countdown = dir.done = false; dir.lastN = 0; return; } // retour en arrière / vidéo suivante
     if (v.paused || dir.done) return;
-    if (rem <= 75 && !dir.finalSaid) { dir.finalSaid = true; talk('final', 4000); st.nextTalk = now + talkGap(); }
+    if (rem <= 75 && !dir.finalSaid) { dir.finalSaid = true; talk('final', 4000); st.nextTalk = now + talkGap(); toComp({ type: 'state', state: 'final' }); }
     if (rem <= 10.5 && !dir.countdown) { dir.countdown = true; dir.lastN = 11; }
     if (dir.countdown) {
       const n = Math.ceil(rem - 0.3);
@@ -606,6 +644,7 @@
     }
   }
   function finale() {
+    toComp({ type: 'state', state: S.finale === 'ruin' || S.finale === 'denial' ? 'pause' : 'cum' });
     const kind = S.finale === 'ruin' ? 'ruin' : S.finale === 'denial' ? 'denial' : 'cum';
     if (kind === 'cum') {
       talk('cum', 7000, { gif: true });
@@ -654,6 +693,7 @@
     $('.snd').textContent = soundsLine();
     $('[data-a="voice"]').classList.toggle('on', !!S.voice);
     $('[data-a="cover"]').classList.toggle('on', !!S.cover);
+    $('[data-a="compagne"]').classList.toggle('on', !!(S.compagne && comp.ok));
     $('[data-a="gifs"]').classList.toggle('on', !!S.gifs);
     $('[data-a="gifs"]').title = gifCount ? `GIF on/off (${gifCount} GIF)` : 'Aucun GIF : mets-en dans le dossier gifs/ de l\'extension';
     $('.meter').classList.toggle('hidden', mode !== 'audio');
@@ -963,6 +1003,10 @@
       case 'track': S.track = !S.track; saveSettings(); break;
       case 'voice': S.voice = !S.voice; if (!S.voice) chrome.runtime.sendMessage({ type: 'gf-hush' }).catch(() => {}); saveSettings(); break;
       case 'gifs': S.gifs = !S.gifs; saveSettings(); if (S.gifs) showGif(); break;
+      case 'compagne':
+        S.compagne = !S.compagne; saveSettings(); placeComp();
+        if (!comp.ok) message('💃 Aucun modèle : dépose un fichier .vrm dans le dossier modele/ de l\'extension, puis recharge-la', 4500, { speak: false });
+        break;
       case 'calib': startCalib(); break;
       case 'source':
         { const order = ['auto', 'funscript', 'visual', 'audio'];
@@ -977,9 +1021,11 @@
         clearPend();
         talk('edge', 4500, { small: 'Au bord ? On coupe tout 15 secondes… respire.' });
         setMood('pause');
-        setTimeout(() => { if (alive) talk(Math.random() < 0.5 ? 'praise' : 'resume', 3000); }, 15000);
+        toComp({ type: 'state', state: 'edge' });
+        setTimeout(() => { if (alive) { talk(Math.random() < 0.5 ? 'praise' : 'resume', 3000); toComp({ type: 'state', state: 'resume' }); } }, 15000);
         break;
       case 'cum':
+        toComp({ type: 'state', state: 'cum' });
         talk('cum', 6000, { gif: true });
         showGif(3);
         rumble(4000, S.power, S.power);
@@ -1021,6 +1067,7 @@
     send({ type: 'settings', settings: { sens: S.sens, band: S.band, minGap: S.minGap, clips: S.clips, moans: S.moans, cumSnd: S.cumSnd, clipVol: S.clipVol, beatSfx: S.beatSfx, beatVol: S.beatVol, beatKind: S.beatKind } });
   }
   function onSettings() {
+    if (typeof compCfg === 'function' && comp.ok) compCfg(false);
     if (fsData) { const nb = fsPick(); if (nb !== fsData.beats) { fsData.beats = nb; fsReset(); } }
     sendSettings(); if (!S.tease) stopTease(); laneSent = ''; updateLane(); }
 
