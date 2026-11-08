@@ -32,7 +32,7 @@ export function resetPose(vrm, M) {
 }
 
 // Cinématique inverse CCD : amène l'extrémité (main) sur la cible, en tournant d'abord le coude puis l'épaule
-function ccd(chain, effector, target, iters = 10) {
+export function ccd(chain, effector, target, iters = 10) {
   for (let it = 0; it < iters; it++) {
     for (let i = chain.length - 1; i >= 0; i--) {
       const j = chain[i];
@@ -50,7 +50,7 @@ function ccd(chain, effector, target, iters = 10) {
   }
 }
 /** Amène la main sur la cible : le poignet par IK, puis les doigts orientés selon fingerDir (monde). */
-export function reach(vrm, side, target, fingerDir) {
+export function reach(vrm, side, target, fingerDir, palmDir) {
   const s = side === 'left' ? 'left' : 'right';
   const ua = bone(vrm, s + 'UpperArm'), la = bone(vrm, s + 'LowerArm'), h = bone(vrm, s + 'Hand');
   if (!ua || !la || !h) return;
@@ -73,6 +73,24 @@ export function reach(vrm, side, target, fingerDir) {
     const wq = h.getWorldQuaternion(new THREE.Quaternion()).premultiply(_q);
     h.quaternion.copy(_q2.invert().multiply(wq));
     h.updateWorldMatrix(false, true);
+    // paume : on fait tourner la main autour de l'axe des doigts pour que la paume regarde palmDir
+    const idx = bone(vrm, s + 'IndexProximal'), lit = bone(vrm, s + 'LittleProximal');
+    if (palmDir && idx && lit) {
+      const ax = fingerDir.clone().normalize();
+      const side = wpos(idx, V()).sub(wpos(lit, V()));
+      // normale de la paume (côté intérieur de la main), même convention pour les deux mains
+      const n = (s === 'left' ? ax.clone().cross(side) : side.clone().cross(ax)).normalize();
+      const want = palmDir.clone().normalize(); want.addScaledVector(ax, -want.dot(ax));
+      if (want.lengthSq() > 1e-6 && n.lengthSq() > 1e-6) {
+        want.normalize(); n.addScaledVector(ax, -n.dot(ax)).normalize();
+        const ang = Math.atan2(n.clone().cross(want).dot(ax), n.dot(want));
+        _q.setFromAxisAngle(ax, ang);
+        h.parent.getWorldQuaternion(_q2);
+        const wq2 = h.getWorldQuaternion(new THREE.Quaternion()).premultiply(_q);
+        h.quaternion.copy(_q2.invert().multiply(wq2));
+        h.updateWorldMatrix(false, true);
+      }
+    }
   }
   // écart restant entre le bout des doigts (ou le poignet) et la cible, en mètres
   return wpos(tip || h, V()).distanceTo(target);
@@ -112,11 +130,11 @@ export function poseMasturbation(vrm, M, d, t, intensity) {
   // haut du sexe (clitoris) : atteignable même avec des bras de personnage anime
   const crotch = new THREE.Vector3(-0.005 * s, hp.y - 0.068 * s, hp.z + 0.085 * s);
   crotch.y += (d - 0.5) * 0.032 * s; crotch.z += (0.5 - d) * 0.01 * s;
-  const err = reach(vrm, 'right', crotch, new THREE.Vector3(0.05, -1, 0.15)); // doigts vers le bas, entre les cuisses
+  const err = reach(vrm, 'right', crotch, new THREE.Vector3(0.05, -1, 0.15), new THREE.Vector3(0, 0, -1)); // doigts vers le bas, paume contre elle
   // main gauche sur son sein gauche (côté +x) : elle le pétrit
   const ch = wpos(bone(vrm, 'chest') || bone(vrm, 'spine'), V());
   const breast = new THREE.Vector3(0.075 * s, ch.y + 0.02 * s + 0.01 * s * Math.sin(t * 3), ch.z + 0.12 * s);
-  const err2 = reach(vrm, 'left', breast, new THREE.Vector3(-0.5, 0.55, 0.3)); // main qui empaume le sein
+  const err2 = reach(vrm, 'left', breast, new THREE.Vector3(-0.5, 0.55, 0.3), new THREE.Vector3(0, 0, -1)); // paume sur le sein
   return { sexe: err, sein: err2 };
 }
 
@@ -147,6 +165,15 @@ export function setupFellation(vrm, M, scene) {
   const len = 0.17 * M.s, r = 0.019 * M.s;
   const tip = m0.clone().addScaledVector(axis, 0.006 * M.s);
   const base = tip.clone().addScaledVector(axis, len);
+  const g = penisMesh(M, len);
+  g.position.copy(tip);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  scene.add(g);
+  return { group: g, tip, base, axis, m0, m1 };
+}
+/** Sexe masculin simple : axe Y local de la pointe (0) vers la base (len). */
+export function penisMesh(M, len) {
+  const r = 0.019 * M.s;
   const g = new THREE.Group();
   const skin = new THREE.MeshStandardMaterial({ color: 0xe2ad98, roughness: 0.55 });
   const head = new THREE.MeshStandardMaterial({ color: 0xd88a8c, roughness: 0.4 });
@@ -157,11 +184,7 @@ export function setupFellation(vrm, M, scene) {
   const balls = new THREE.Mesh(new THREE.SphereGeometry(r * 1.9, 20, 14), skin);
   balls.scale.set(1.3, 0.8, 0.9); balls.position.set(0, len + r * 0.6, -r * 1.6);
   g.add(shaft, glans, balls);
-  // l'axe Y local du groupe va de la pointe vers la base
-  g.position.copy(tip);
-  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
-  scene.add(g);
-  return { group: g, tip, base, axis, m0, m1 };
+  return g;
 }
 
 export function poseFellation(vrm, M, F, d, t, intensity, handOnShaft) {
@@ -172,9 +195,9 @@ export function poseFellation(vrm, M, F, d, t, intensity, handOnShaft) {
   const hp = wpos(bone(vrm, 'hips'), V());
   if (handOnShaft && F) {
     const grip = F.base.clone().lerp(F.tip, 0.25 + 0.3 * d);
-    reach(vrm, 'right', grip, new THREE.Vector3(-0.6, 0.2, -0.2));
-  } else reach(vrm, 'right', new THREE.Vector3(-0.11 * M.s, hp.y - 0.05 * M.s, hp.z + 0.17 * M.s), new THREE.Vector3(0, -0.3, 1));
-  reach(vrm, 'left', new THREE.Vector3(0.11 * M.s, hp.y - 0.05 * M.s, hp.z + 0.17 * M.s), new THREE.Vector3(0, -0.3, 1)); // mains sur les cuisses
+    reach(vrm, 'right', grip, new THREE.Vector3(-0.6, 0.2, -0.2), F.axis.clone().negate().cross(new THREE.Vector3(0, 1, 0)).add(new THREE.Vector3(0.3, 0, 0)));
+  } else reach(vrm, 'right', new THREE.Vector3(-0.11 * M.s, hp.y - 0.05 * M.s, hp.z + 0.17 * M.s), new THREE.Vector3(0, -0.3, 1), new THREE.Vector3(0, -1, 0));
+  reach(vrm, 'left', new THREE.Vector3(0.11 * M.s, hp.y - 0.05 * M.s, hp.z + 0.17 * M.s), new THREE.Vector3(0, -0.3, 1), new THREE.Vector3(0, -1, 0)); // mains sur les cuisses
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +225,14 @@ export function setupRiding(vrm, M, scene) {
   const tip = c0.clone().addScaledVector(axis, 0.025 * M.s);
   // longueur : jusqu'au sol
   const len = Math.max(0.16 * M.s, (tip.y - 0.0) / Math.max(0.3, -axis.y));
+  const g = dildoMesh(M, len);
+  g.position.copy(tip);
+  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+  scene.add(g);
+  return { group: g, tip, axis, c0, c1 };
+}
+/** Gode : axe Y local de la pointe (0) vers le socle (len). */
+export function dildoMesh(M, len) {
   const r = 0.024 * M.s;
   const mat = new THREE.MeshStandardMaterial({ color: 0xd4123c, roughness: 0.28, metalness: 0.05 });
   const g = new THREE.Group();
@@ -210,19 +241,17 @@ export function setupRiding(vrm, M, scene) {
   const balls = new THREE.Mesh(new THREE.SphereGeometry(r * 2.1, 22, 16), mat); balls.scale.set(1.35, 0.85, 1); balls.position.set(0, len - r * 1.2, r * 1.5);
   const base = new THREE.Mesh(new THREE.CylinderGeometry(r * 2.4, r * 2.6, r * 0.6, 28), mat); base.position.y = len;
   g.add(shaft, head, balls, base);
-  g.position.copy(tip);
-  g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
-  scene.add(g);
-  return { group: g, tip, axis, c0, c1 };
+  return g;
 }
+export { crotchPos };
 export function poseRiding(vrm, M, R, d, t, intensity) {
   ridingBody(vrm, M, d);
   addW(vrm, 'hips', 0, Math.sin(t * 0.8) * 0.05, 0); // petit roulement des hanches
   vrm.scene.updateMatrixWorld(true);
   const hp = wpos(bone(vrm, 'hips'), V());
   // mains posées à plat sur le haut des cuisses, devant elle
-  reach(vrm, 'right', new THREE.Vector3(-0.12 * M.s, hp.y - 0.06 * M.s, hp.z + 0.16 * M.s), new THREE.Vector3(0, -0.4, 1));
-  reach(vrm, 'left', new THREE.Vector3(0.12 * M.s, hp.y - 0.06 * M.s, hp.z + 0.16 * M.s), new THREE.Vector3(0, -0.4, 1));
+  reach(vrm, 'right', new THREE.Vector3(-0.12 * M.s, hp.y - 0.06 * M.s, hp.z + 0.16 * M.s), new THREE.Vector3(0, -0.4, 1), new THREE.Vector3(0, -1, 0));
+  reach(vrm, 'left', new THREE.Vector3(0.12 * M.s, hp.y - 0.06 * M.s, hp.z + 0.16 * M.s), new THREE.Vector3(0, -0.4, 1), new THREE.Vector3(0, -1, 0));
 }
 
 // ---------------------------------------------------------------------------
@@ -249,8 +278,8 @@ export function poseTwerk(vrm, M, d, t, intensity) {
   // mains sur les genoux
   const kn = s => wpos(bone(vrm, s + 'LowerLeg'), V());
   const kl = kn('left'), kr = kn('right');
-  reach(vrm, 'left', kl.clone().add(new THREE.Vector3(0.0, 0.05 * M.s, 0.05 * M.s)), new THREE.Vector3(0.2, -0.6, 0.8));
-  reach(vrm, 'right', kr.clone().add(new THREE.Vector3(0.0, 0.05 * M.s, 0.05 * M.s)), new THREE.Vector3(-0.2, -0.6, 0.8));
+  reach(vrm, 'left', kl.clone().add(new THREE.Vector3(0.0, 0.05 * M.s, 0.05 * M.s)), new THREE.Vector3(0.2, -0.6, 0.8), new THREE.Vector3(0, -1, 0));
+  reach(vrm, 'right', kr.clone().add(new THREE.Vector3(0.0, 0.05 * M.s, 0.05 * M.s)), new THREE.Vector3(-0.2, -0.6, 0.8), new THREE.Vector3(0, -1, 0));
 }
 
 /** Position de caméra pour une scène et une vue ('pov' | 'cote'). */

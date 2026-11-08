@@ -1,9 +1,21 @@
-(Facultatif) Dépose ici des animations d'artistes au format .vrma pour remplacer
-les animations calculées par GoonFap. Le nom du fichier décide de la scène :
+Dépose ici des animations pour remplacer celles calculées par GoonFap :
+  - animations MMD (.vmd) — par ex. trouvées sur Iwara, DeviantArt, BowlRoll
+  - animations VRM (.vrma)
 
-  …mastur… / …fap… / …finger… / …solo…   → elle se masturbe
-  …blow… / …fella… / …suck… / …bj…      → fellation
-  …dance… / …idle… / …strip…            → danse
+Le NOM DU FICHIER ou du DOSSIER décide de la scène :
+  …mastur… / …fap… / …finger… / …solo…        → elle se masturbe
+  …blow… / …fella… / …suck… / …bj… / …oral…   → fellation
+  …ride… / …riding… / …chevauch… / …dildo…    → chevauche
+  …twerk…                                    → twerk
+  …dance… / …danse… / …idle… / …strip…        → danse
 
-GoonFap les joue en boucle et accélère / ralentit leur vitesse selon le tempo de la vidéo.
-Vérifie que leur licence autorise cet usage. Puis : chrome://extensions → « Recharger ».
+Exemple : animations/masturbation/asuna.vmd  ou  animations/blowjob_pov.vmd
+S'il y en a plusieurs pour une même scène, GoonFap en tire une au hasard à chaque fois.
+
+GoonFap détecte la durée d'un « cycle » du mouvement et accélère / ralentit l'animation
+pour que chaque cycle tombe pile sur les beats de la vidéo.
+Pour la fellation et la chevauche, le sexe / le gode est placé d'après le mouvement réel.
+
+Une animation .vmd ne contient que du mouvement (pas de personnage) : elle s'applique
+à ton modèle .vrm. Vérifie la licence de chaque animation (souvent dans un readme).
+Puis : chrome://extensions → « Recharger ».

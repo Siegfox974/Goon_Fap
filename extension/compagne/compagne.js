@@ -7,6 +7,7 @@ import { VRMLoaderPlugin, VRMUtils } from './lib/three-vrm.module.js';
 import { nudify, clothes } from './nudify.js';
 import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from './lib/three-vrm-animation.module.js';
 import * as P from './poses.js';
+import * as VMD from './vmd.js';
 
 // nude : 'nue' | 'strip' | 'habillee' ; frame : 'buste' | 'entiere'
 // scene : 'auto' | 'danse' | 'masturbation' | 'fellation' ; view : 'pov' | 'cote'
@@ -16,6 +17,7 @@ const st = { e: 0, phase: 0, lastBeat: 0, period: 600, mood: 'warm', state: 'pla
 let M = null, F = null, R = null;            // mesures du modèle, fellation (sexe masculin), chevauche (gode)
 const anims = {};                             // animations .vrma par scène (dossier animations/)
 let mixer = null, action = null, actionScene = null;
+let feetRest = null, vmdCur = null, vmdTime = 0;            // animation MMD en cours
 let licenceOk = true; // la licence du modèle autorise-t-elle la nudité / le sexe ?
 let vrm = null, renderer, scene, camera, clock, skin = null, origTex = null, nudeRep = null, wear = [];
 
@@ -88,7 +90,18 @@ function stripMore(why) {
 const SCENE_OF = f => /mastur|fap|finger|touch|rub|solo/i.test(f) ? 'masturbation' : /blow|fella|suck|bj|oral|pipe/i.test(f) ? 'fellation'
   : /ride|riding|chevauch|dildo|gode|cowgirl/i.test(f) ? 'chevauche' : /twerk/i.test(f) ? 'twerk' : /dance|danse|idle|tease|strip/i.test(f) ? 'danse' : null;
 async function loadAnims(loader) {
-  const files = (await GF.listDir('animations')).filter(f => /\.vrma$/i.test(f));
+  const all = await GF.listDir('animations');
+  // animations MMD (.vmd)
+  for (const f of all.filter(x => /\.vmd$/i.test(x))) {
+    const sc = SCENE_OF(f); if (!sc) continue;
+    try {
+      const buf = await (await fetch(chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/')))).arrayBuffer();
+      const clip = VMD.parseVmd(buf); clip.name = f.split('/').pop();
+      (anims[sc] = anims[sc] || []).push({ vmd: clip });
+    } catch (e) { post({ type: 'anim-error', file: f, error: String(e && e.message || e) }); }
+  }
+  if (Object.values(anims).some(l => l.some(a => a.vmd))) { feetRest = VMD.restFeet(vrm, M); restPose(); post({ type: 'anims', scenes: Object.keys(anims), list: Object.entries(anims).map(([k, l]) => k + ':' + l.map(a => a.vmd ? a.vmd.name + (a.vmd.cycle ? ' (cycle ' + a.vmd.cycle.toFixed(2) + ' s)' : '') : 'vrma').join(',')) }); }
+  const files = all.filter(f => /\.vrma$/i.test(f));
   if (!files.length) return;
   const l = new GLTFLoader(); l.register(p => new VRMAnimationLoaderPlugin(p));
   for (const f of files) {
@@ -96,10 +109,42 @@ async function loadAnims(loader) {
     try {
       const g = await l.loadAsync(chrome.runtime.getURL(f.split('/').map(encodeURIComponent).join('/')));
       const va = g.userData.vrmAnimations && g.userData.vrmAnimations[0];
-      if (va) (anims[sc] = anims[sc] || []).push(createVRMAnimationClip(va, vrm));
+      if (va) (anims[sc] = anims[sc] || []).push({ vrma: createVRMAnimationClip(va, vrm) });
     } catch (e) {}
   }
-  if (Object.keys(anims).length) { mixer = new THREE.AnimationMixer(vrm.scene); post({ type: 'anims', scenes: Object.keys(anims) }); }
+  if (Object.values(anims).some(l => l.some(a => a.vrma))) mixer = new THREE.AnimationMixer(vrm.scene);
+}
+
+// Accessoire (sexe / gode) placé d'après le mouvement réel d'une animation MMD
+function vmdSpan(clip) { return Math.min(clip.frames, clip.cycle ? Math.round(clip.cycle * 30 * 2) : clip.frames); }
+function setupVmdProp(sc, clip) {
+  if (clip.prop !== undefined) return clip.prop;
+  const n = 24, span = vmdSpan(clip), pts = [], fwd = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    VMD.applyVmd(vrm, M, clip, (i / n) * span, feetRest);
+    if (sc === 'fellation') {
+      pts.push(P.mouthPos(vrm, M).clone());
+      const h = P.bone(vrm, 'head'); fwd.add(new THREE.Vector3(0, 0, -1).transformDirection(h.matrixWorld));
+    } else pts.push(P.crotchPos(vrm, M).clone());
+  }
+  let prop = null;
+  if (sc === 'fellation') {
+    const axis = fwd.normalize();                       // devant son visage
+    let mn = Infinity, mx = -Infinity, shallow = pts[0];
+    for (const p of pts) { const d = p.dot(axis); if (d < mn) mn = d; if (d > mx) { mx = d; } }
+    // pointe : là où sa bouche recule le plus ; le sexe s'étend vers l'avant
+    shallow = pts.reduce((a, p) => (p.dot(axis) < a.dot(axis) ? p : a));
+    const len = Math.max(0.15 * M.s, (mx - mn) + 0.08 * M.s);
+    const g = P.penisMesh(M, len); g.position.copy(shallow); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    scene.add(g); prop = { group: g, tip: shallow.clone(), base: shallow.clone().addScaledVector(axis, len), axis };
+  } else if (sc === 'chevauche') {
+    const top = pts.reduce((a, p) => (p.y > a.y ? p : a));
+    const axis = new THREE.Vector3(0, -1, 0), len = Math.max(0.14 * M.s, top.y);
+    const g = P.dildoMesh(M, len); g.position.copy(top); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    scene.add(g); prop = { group: g, tip: top.clone(), base: top.clone().addScaledVector(axis, len), axis };
+  }
+  clip.prop = prop;
+  return prop;
 }
 
 // ---------- Choix de la scène ----------
@@ -129,6 +174,8 @@ const VIEW_DIR = {
 };
 const fits = {};
 function poseScene(sc, d, t = 0) {
+  const vm = (anims[sc] || []).find(a => a.vmd);
+  if (vm) { VMD.applyVmd(vrm, M, vm.vmd, d * vmdSpan(vm.vmd), feetRest); return; }
   if (sc === 'masturbation') P.poseMasturbation(vrm, M, d, t, 1);
   else if (sc === 'fellation') P.poseFellation(vrm, M, F, d, t, 1, false);
   else if (sc === 'chevauche') P.poseRiding(vrm, M, R, d, t, 1);
@@ -139,12 +186,13 @@ function poseScene(sc, d, t = 0) {
 function computeFit(sc) {
   const pts = [];
   const names = ['head', 'neck', 'hips', 'chest', 'leftHand', 'rightHand', 'leftLowerArm', 'rightLowerArm', 'leftLowerLeg', 'rightLowerLeg', 'leftFoot', 'rightFoot', 'leftToes', 'rightToes'];
-  for (const d of [0, 0.5, 1]) {
+  for (const d of [0, 0.2, 0.4, 0.6, 0.8, 1]) {
     poseScene(sc, d);
     for (const n of names) { const b = B(n); if (b) pts.push(P.wpos(b).clone()); }
     const h = B('head'); if (h) pts.push(new THREE.Vector3(0, 0.17 * M.s, 0).applyMatrix4(h.matrixWorld)); // haut du crâne
   }
-  const prop = sc === 'fellation' ? F : sc === 'chevauche' ? R : null;
+  const vmProp = (anims[sc] || []).find(a => a.vmd);
+  const prop = vmProp ? vmProp.vmd.prop : sc === 'fellation' ? F : sc === 'chevauche' ? R : null;
   if (prop) { pts.push(prop.tip.clone()); if (prop.base) pts.push(prop.base.clone()); else pts.push(prop.tip.clone().addScaledVector(prop.axis, 0.2 * M.s)); }
   const box = new THREE.Box3().setFromPoints(pts);
   const center = box.getCenter(new THREE.Vector3());
@@ -167,10 +215,15 @@ function switchScene(sc) {
   if (sc === st.scene) return;
   st.scene = sc; st.sceneSince = performance.now();
   if (sc !== 'danse' && cfg.nude !== 'habillee' && !naked()) { st.stage = wear.length; applyWear(); } // elle se met nue pour ça
-  if (sc === 'fellation' && !F) F = P.setupFellation(vrm, M, scene);
-  if (sc === 'chevauche' && !R) R = P.setupRiding(vrm, M, scene);
-  if (F) F.group.visible = sc === 'fellation';
-  if (R) R.group.visible = sc === 'chevauche';
+  const vlist = (anims[sc] || []).filter(a => a.vmd);
+  vmdCur = vlist.length ? vlist[Math.floor(Math.random() * vlist.length)].vmd : null; vmdTime = 0;
+  Object.values(anims).flat().forEach(a => { if (a.vmd && a.vmd.prop) a.vmd.prop.group.visible = false; });
+  if (vmdCur) { setupVmdProp(sc, vmdCur); if (vmdCur.prop) vmdCur.prop.group.visible = true; }
+  if (!vmdCur && sc === 'fellation' && !F) F = P.setupFellation(vrm, M, scene);
+  if (!vmdCur && sc === 'chevauche' && !R) R = P.setupRiding(vrm, M, scene);
+  if (F) F.group.visible = sc === 'fellation' && !vmdCur;
+  if (R) R.group.visible = sc === 'chevauche' && !vmdCur;
+  delete fits[sc];
   if (!fits[sc]) fits[sc] = computeFit(sc);
   // petit fondu pour masquer le changement de pose
   renderer.domElement.style.transition = 'none'; renderer.domElement.style.opacity = '0';
@@ -272,8 +325,16 @@ function step() {
   if (want !== st.scene && now - st.sceneSince > 8000) switchScene(want); // pas plus d'un changement toutes les 8 s
   const intensity = st.mood === 'fast' || st.mood === 'faster' ? 1 : st.mood === 'medium' ? 0.7 : 0.45;
   const d = active ? depth(now) : 0.15;
-  const clips = anims[st.scene];
-  if (mixer && clips && clips.length) {
+  const clips = (anims[st.scene] || []).filter(a => a.vrma).map(a => a.vrma);
+  let vmdFace = null;
+  if (vmdCur) {
+    // animation MMD : chaque cycle calé sur un nombre entier de beats (vitesse proche de l'originale)
+    let rate = 1;
+    if (active && vmdCur.cycle) { const beat = st.period / 1000, k = Math.max(1, Math.round(vmdCur.cycle / beat)); rate = Math.max(0.4, Math.min(2.5, vmdCur.cycle / (k * beat))); }
+    else if (!active) rate = 0.35;
+    vmdTime += dt * rate;
+    vmdFace = VMD.applyVmd(vrm, M, vmdCur, (vmdTime * 30) % vmdCur.frames, feetRest);
+  } else if (mixer && clips && clips.length) {
     // animation d'artiste : on la joue, à une vitesse calée sur le tempo
     if (actionScene !== st.scene) { action = mixer.clipAction(clips[Math.floor(Math.random() * clips.length)]); action.reset().fadeIn(0.3).play(); actionScene = st.scene; }
     const clipDur = action.getClip().duration;
@@ -311,6 +372,7 @@ function step() {
 
   // expressions + clignements + bouche quand elle parle
   moodTargets(t);
+  if (vmdFace) for (const [k, w] of Object.entries(vmdFace)) if (k in target) target[k] = Math.max(target[k], w);
   if (st.scene === 'fellation') { target.oh = 0.85; target.aa = 0.2; target.blink = Math.max(target.blink, 0.2); target.happy = 0.15; }
   else if (st.scene === 'chevauche') { target.oh = Math.max(target.oh, 0.35 + 0.4 * d * intensity); target.blink = Math.max(target.blink, 0.35); target.happy = Math.max(target.happy, 0.35); }
   else if (st.scene === 'twerk') { target.happy = Math.max(target.happy, 0.6); target.aa = Math.max(target.aa, 0.1 + 0.15 * d); }

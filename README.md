@@ -127,7 +127,15 @@ Dépose un modèle **VRM** (`.vrm`) dans `extension/modele/`, puis recharge l'ex
 
 Elle est **toujours cadrée en entier**, sur fond transparent : la vidéo reste visible tout autour, et elle reste affichée dans le plein écran du site. Taille et côté se règlent dans le popup.
 
-Ces animations sont calculées par programme : crédibles, mais un peu raides. Pour un rendu d'artiste, dépose des animations **`.vrma`** dans `extension/animations/` (voir le `LISEZ-MOI.txt` du dossier). GoonFap les joue à la place, à la vitesse du tempo.
+Ces animations sont calculées par programme : crédibles, mais un peu raides.
+
+**Animations d'artistes (recommandé) : MMD `.vmd`** (Iwara, DeviantArt, BowlRoll…) ou VRM `.vrma`. Dépose-les dans `extension/animations/`. Le nom du fichier ou du dossier décide de la scène : *masturbation*, *blowjob*, *riding*, *twerk*, *dance*… Le `LISEZ-MOI.txt` du dossier donne le détail.
+
+- GoonFap les adapte à ton modèle VRM : noms d'os japonais, pose de repos, jambes par cinématique inverse, mimiques du visage.
+- Il **détecte la durée d'un cycle** du mouvement et l'accélère ou le ralentit pour qu'il tombe pile sur les beats.
+- Pour la fellation et la chevauche, le sexe ou le gode est placé d'après le mouvement réel.
+
+Une animation `.vmd` ne contient que du mouvement : elle s'applique à **ton** modèle. Les modèles MMD (`.pmx`) d'Iwara ne sont pas pris en charge.
 
 GoonFap retire les vêtements et prépare une **peau nue** tout seul, en mémoire, sans modifier ton fichier : il efface ce qui est peint sur la peau (collants, culotte) et dessine aréoles, tétons et sexe aux bons endroits.
 Le bouton **💃** du panneau l'affiche ou la cache. Tenue, cadrage (buste / en entier), côté et taille se règlent dans le popup.
@@ -178,7 +186,7 @@ Une bonne source est l'[OpenNSFW Sound Pack](https://opennsfw.carrd.co/), gratui
 - le **SFX Pack** contient les claquements, la bouche et les orgasmes ;
 - les **gémissements** sont dans les packs de voix (*MoanPack*, *VoicePack*) du même site.
 
-Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/`, `sons/`, `modele/` et `animations/` sont ignorés par git.
+Leurs conditions interdisent de ré-empaqueter les sons, c'est pourquoi ils ne sont pas inclus dans ce dépôt. Les dossiers `gifs/`, `sons/`, `modele/` et `animations/` sont ignorés par git (seuls leurs LISEZ-MOI sont suivis).
 
 ## L'application web (vidéos sur ton PC, programmes générés)
 
